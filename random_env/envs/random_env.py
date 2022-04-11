@@ -11,18 +11,21 @@ import pickle as pkl
 
 from qfb_env.envs import QFBNLEnv
 
+
 class RandomEnv(Env):
 	EPISODE_LENGTH_LIMIT = 100
 	REWARD_DEQUE_SIZE = 1 #5
-	REWARD_SCALE = 0.005
+	REWARD_SCALE = 0.05
 	ACTION_SCALE = 1.0  # set to one during dynamic output scale adjustment test
 	GOAL = 0.1  # state threshold boundary
 	_UPDATE_SCALING = False
-	TRIM_FACTOR = 0.2 # Have many times smaller should the average state trim be than an state space bounds
+	TRIM_FACTOR = 0.2
+
+	# Have many times smaller should the average state trim be than an state space bounds
 	RESET_RANDOM_WALK_STEPS = 50 # Reset func starts from optimal state, and walks randomly for these amount of steps
 	SAVED_MODEL_SUFFIX = '_dynamics.pkl'
-	K_p = 4
-	K_i = 0
+	K_p = 1.0
+	K_i = 0.0
 
 	def __init__(self, n_obs, n_act, estimate_scaling=True, model_info=None, seed=123):
 		"""
@@ -86,6 +89,8 @@ class RandomEnv(Env):
 		self.reward_deque.clear()
 		self._it = 0
 
+		self.prev_error = np.zeros(self.obs_dimension)
+
 		return np.copy(init_state)
 
 	def step(self, action):
@@ -95,6 +100,7 @@ class RandomEnv(Env):
 
 		# # Standardise trims by stats in obs_stats
 		trim_state = np.divide(trim_state - self.trim_stats.mean, self.trim_stats.std)
+		trim_state *= RandomEnv.TRIM_FACTOR
 
 		# Normalise trims by stats in obs_stats
 		# trim_state = self.normalise_trim(trim_state)
@@ -130,9 +136,10 @@ class RandomEnv(Env):
 		return done, success
 
 	def get_optimal_action(self, state):
-		clip = 0.5
-		state = np.clip(state, -clip, clip)
-		action = -self.pi.dot(RandomEnv.K_p * state)
+		# clip = 0.5
+		# state = np.clip(state, -clip, clip)
+		action = -self.pi.dot(RandomEnv.K_p * state + RandomEnv.K_i * self.prev_error)
+		self.prev_error = np.copy(state)
 		# return np.divide(action, RandomEnv.ACTION_SCALE)
 		return action / max([1.0, max(abs(action))])  # linearly scaled response to fit within [-1, 1]
 
@@ -171,10 +178,10 @@ class RandomEnv(Env):
 		s = np.pad(s, ((0, first_pad), (0, second_pad)))
 
 		# Get inverse components
-		sinv = None
 		with warnings.catch_warnings():
 			warnings.simplefilter("ignore")
 			sinv = np.where(1 / s == np.inf, 0, 1 / s)
+		sinv = sinv.T
 		uh = u.T
 		v = vh.T
 
@@ -330,10 +337,10 @@ class RunningStats():
 		self.n = 0
 
 	def __repr__(self):
-		return f"Observation mean: min={min(self.mean):.2f} max={max(self.mean):.2f}\n" \
-		       f"            std:  min={min(self.std):.2f} max={max(self.std):.2f}\n" \
-		       f"Observation Min = {self.Min}\n" \
-		       f"Observation Max = {self.Max}"
+		return f"Mean: min={min(self.mean):.2f} max={max(self.mean):.2f}\n" \
+		       f"Std:  min={min(self.std):.2f}  max={max(self.std):.2f}\n" \
+		       f"Min = {self.Min}\n" \
+		       f"Max = {self.Max}"
 
 	def add(self, x):
 		self.n += 1
