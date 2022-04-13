@@ -9,9 +9,6 @@ from gym.spaces import Box
 from scipy import stats
 import pickle as pkl
 
-from qfb_env.envs import QFBNLEnv
-
-
 class RandomEnv(Env):
 	EPISODE_LENGTH_LIMIT = 100
 	REWARD_DEQUE_SIZE = 1 #5
@@ -19,15 +16,16 @@ class RandomEnv(Env):
 	ACTION_SCALE = 1.0  # set to one during dynamic output scale adjustment test
 	GOAL = 0.1  # state threshold boundary
 	_UPDATE_SCALING = False
-	TRIM_FACTOR = 0.2
 
 	# Have many times smaller should the average state trim be than an state space bounds
+	TRIM_FACTOR = 10
+
 	RESET_RANDOM_WALK_STEPS = 50 # Reset func starts from optimal state, and walks randomly for these amount of steps
 	SAVED_MODEL_SUFFIX = '_dynamics.pkl'
 	K_p = 1.0
 	K_i = 0.0
 
-	def __init__(self, n_obs, n_act, estimate_scaling=True, model_info=None, seed=123):
+	def __init__(self, n_obs, n_act, estimate_scaling=True, model_info=None):
 		"""
 		An OpenAI Gym environment with random transition dynamics.
 		:param n_obs: 1D observations space size
@@ -38,7 +36,6 @@ class RandomEnv(Env):
 		"""
 		super(RandomEnv, self).__init__()
 		self.obs_dimension, self.act_dimension = n_obs, n_act
-		self.seed(seed)
 
 		''' State and action space'''
 		self.observation_space = Box(low=-1.0,
@@ -98,41 +95,31 @@ class RandomEnv(Env):
 		action = np.multiply(action, RandomEnv.ACTION_SCALE)
 		trim_state = self.rm.dot(action)
 
-		# # Standardise trims by stats in obs_stats
-		trim_state = np.divide(trim_state - self.trim_stats.mean, self.trim_stats.std)
-		trim_state *= RandomEnv.TRIM_FACTOR
-
-		# Normalise trims by stats in obs_stats
-		# trim_state = self.normalise_trim(trim_state)
+		# Standardise trims by stats in trim_stats
+		trim_state = self.standardise_trim(trim_state)
 
 		self.current_state += trim_state
 		r = self.objective(self.current_state)
 		self.reward = r
 		done, success = self._is_done()
 
+		self._it += 1
+
 		return self.current_state, r, done, dict(success=success)
 
 	def objective(self, state):
 		# state_reward = -np.sum(np.square(state)) / self.obs_dimension
-
 		state_reward = -np.sqrt(np.mean(np.square(state)))
-
 		return state_reward * RandomEnv.REWARD_SCALE
 
 	def _is_done(self):
-		self._it += 1
-
-		done = False
-		success = False
-
+		done, success = False, False
 		# Reach goal
-		if len(self.reward_deque) == RandomEnv.REWARD_DEQUE_SIZE and np.max(np.abs(self.current_state
-		                                                                           )) <= RandomEnv.GOAL:
+		if len(self.reward_deque) >= RandomEnv.REWARD_DEQUE_SIZE and \
+				np.max(np.abs(self.current_state)) <= RandomEnv.GOAL:
+			done, success = True, True
+		elif self._it >= RandomEnv.EPISODE_LENGTH_LIMIT - 1:
 			done = True
-			success = True
-		elif self._it >= RandomEnv.EPISODE_LENGTH_LIMIT:
-			done = True
-
 		return done, success
 
 	def get_optimal_action(self, state):
@@ -190,10 +177,12 @@ class RandomEnv(Env):
 		self.pi = v.dot(sinv.dot(uh))
 
 	def normalise_trim(self, trim):
-		K = RandomEnv.TRIM_FACTOR
-		normalised = np.divide(trim - self.trim_stats.min, self.trim_stats.ptp) * 2.0 - 1.0
+		trim_normed = np.divide(trim - self.trim_stats.min, self.trim_stats.ptp) * 2.0 - 1.0
+		return trim_normed / RandomEnv.TRIM_FACTOR
 
-		return normalised * K
+	def standardise_trim(self, trim):
+		trim_stded = np.divide(trim - self.trim_stats.mean, self.trim_stats.std)
+		return trim_stded / RandomEnv.TRIM_FACTOR
 
 	@property
 	def model_info(self):
@@ -268,15 +257,16 @@ def get_model_output_bounds():
 
 # 02/02/2022
 def quick_testing_randomenv():
-	n_obs = 100
-	n_act = 100
+	n_obs = 10
+	n_act = 10
 
-	env = RandomEnv(n_obs, n_act, estimate_scaling=True)
+	# env = RandomEnv(n_obs, n_act, estimate_scaling=True)
+	env = RandomEnv.load_from_dir("C:\\Users\\Leander\\Code\\RandomEnvRLTests\\common_envs")
 
 	d = False
 	o1 = env.reset()
 	o_list = [o1]
-	a_list = [np.zeros(n_act)]
+	a_list = []
 
 	# print(np.linalg.det(env.pi),np.linalg.det(env.rm))
 
@@ -574,8 +564,24 @@ def save_stupid_env():
 
 	env.save_dynamics('H:/Code/RandomEnvRLTests')
 
+def get_average_ep_len():
+	SZ = 10
+	env = RandomEnv(SZ, SZ, True)
 
+	ep_lens = []
+	for ep in range(1000):
+		o = env.reset()
+		for step in range(env.max_steps):
+			a = env.get_optimal_action(o)
+			o, r, d, _ = env.step(a)
+			if d: break
+		ep_lens.append(step)
+
+	mean_ep_len = np.mean(ep_lens)
+	std_ep_len = np.std(ep_lens)
+	print(f'Episode length = {mean_ep_len} +- {std_ep_len}')
 if __name__ == '__main__':
+	# get_average_ep_len()
 	quick_testing_randomenv()
 	# get_model_output_bounds()
 	# dynamic_scale_adjustment_test()

@@ -1,17 +1,17 @@
 import os
 import shutil
-from collections import deque
-from abc import ABC
+from abc import ABC, abstractmethod
 from datetime import datetime as dt
 import numpy as np
+
+from random_env.envs import RandomEnv
+import my_agents_utils as utils
 
 import torch as t
 from torch.optim import Adam, SGD
 from torch.distributions import MultivariateNormal
 from torch.autograd import grad
 
-from random_env.envs import RandomEnv
-import my_agents_utils as utils
 
 from collections import namedtuple
 Rollout = namedtuple('Rollout', ['states', 'actions', 'rewards', 'next_states', ])
@@ -20,9 +20,10 @@ COMET_WORKSPACE = 'testing_ppo_trpo'
 
 
 class OnPolicy(ABC):
-	def __init__(self, env):
-		self._init_hparams()
+	def __init__(self, env, **kwargs):
 		self.env = env
+		self._init_hparams(**kwargs)
+
 		self.obs_dim = env.observation_space.shape[0]
 		self.act_dim = env.action_space.shape[0]
 
@@ -31,11 +32,15 @@ class OnPolicy(ABC):
 		self.writer = None
 
 	@abstractmethod
-	def _init_hparams(self):
+	def _init_hparams(self, **kwargs):
 		pass
 
 	@abstractmethod
-	def learn(self, total_timesteps, callback, log_dir=None):
+	def get_hparams(self):
+		pass
+
+	@abstractmethod
+	def learn(self, total_timesteps, callback, writer=None):
 		pass
 
 	@abstractmethod
@@ -47,67 +52,58 @@ class OnPolicy(ABC):
 		pass
 
 	def rollout(self, *args, **kwargs):
+		"""
+		Return a lists of s, a, r, s', log_probs,
+		:param args:
+		:param kwargs:
+		:return:
+		"""
 		# Batch data
 		batch_size = args[0]
 		ep_max_size = args[1]
 
-		batch_obs = np.zeros((batch_size, self.obs_dim))  # batch observations
-		batch_acts = np.zeros((batch_size, self.obs_dim))  # batch actions
-		batch_log_probs = []  # log probs of each action
-		batch_rews = []  # batch rewards
-		batch_lens = []  # episodic lengths in batch
+		K = self.env.max_steps
+		B = batch_size // K
 
-		t_so_far = 0
-		while t_so_far < batch_size:
+		batch_obs = t.zeros((B, K, self.obs_dim))  # batch observations
+		batch_acts = t.zeros((B, K, self.obs_dim))  # batch actions
+		batch_log_probs = t.zeros((B, K))  # log probs of each action
+		batch_rews = t.zeros_like(batch_log_probs)  # batch rewards
+		batch_lens = t.zeros(B)  # episodic lengths in batch
+
+		for b in range(B):
 			o = self.env.reset()
-			ep_rews = []
-			for ep_t in range(ep_max_size):
-				self.num_timesteps += 1
-				t_so_far += 1
-				batch_obs.append(o)
-
-				a, log_prob = self.get_action(o)
+			for k in range(K):
+				a, log_prob = self.predict(o, deterministic=False)
+				batch_obs[b,k] = t.tensor(o)
 				o, r, d, _ = self.env.step(a)
 				self._callback.on_step()
-
-				ep_rews.append(r)
-				batch_acts.append(a)
-				batch_log_probs.append(log_prob)
-
+				self.num_timesteps += 1
+				batch_acts[b,k] = a
+				batch_log_probs[b,k] = log_prob
+				batch_rews[b,k] = r
 				if d: break
-
-			# collect episodic data
-			batch_lens.append(ep_t + 1)
-			batch_rews.append(ep_rews)
-
-		batch_obs = t.tensor(batch_obs, dtype=t.float)
-		batch_acts = t.tensor(batch_acts, dtype=t.float)
-		batch_log_probs = t.tensor(batch_log_probs, dtype=t.float)
-
+			batch_lens[b] = k + 1
 		batch_rtgs = self.compute_rtgs(batch_rews)
+		return batch_obs, batch_acts, batch_rews, batch_log_probs, batch_rtgs, batch_lens
 
-		return batch_obs, batch_acts, batch_log_probs, batch_rtgs, batch_lens
-
-	def compute_rtgs(self, batch_rews):
-		batch_rtgs = []
-		for ep_rews in reversed(batch_rews): # reverse maintains order on append
-			discounted_r = 0
-			for r in reversed(ep_rews):
-				discounted_r = r + discounted_r * self.gamma
-				batch_rtgs.insert(0, discounted_r)
-
-		batch_rtgs = t.tensor(batch_rtgs, dtype=t.float)
+	def compute_rtgs(self, batch_rews, discount=None):
+		if discount is None:
+			discount = self.gamma
+		b, k = batch_rews.shape
+		pows = t.pow(discount, t.arange(k))
+		discounted_rews = pows * t.cat([batch_rews[:, 1:], t.zeros(b, 1)], dim=-1)
+		batch_rtgs = t.cumsum(discounted_rews.flip(-1), dim=-1).flip(-1) / pows
 		return batch_rtgs
 
 class PPO(OnPolicy):
-	def __init__(self, env):
+	def __init__(self, env, **kwargs):
 		self.__name = None
-		super(PPO, self).__init__(env)
+		super(PPO, self).__init__(env, **kwargs)
 		self.env = env
 		# Initialize actor critic
-		actor_hidden_layers = [200, 200]
-		self.actor = utils.MLP(self.obs_dim, self.act_dim, actor_hidden_layers)
-		self.critic = utils.MLP(self.obs_dim, 1, [200, 100])
+		self.actor = utils.MLP(self.obs_dim, self.act_dim, self.actor_hidden_layers)
+		self.critic = utils.MLP(self.obs_dim, 1, self.critic_hidden_layers)
 
 		# Create actor covariance matrix
 		self.cov_var = t.full(size=(self.act_dim,), fill_value=0.1) # 0.5 arbitrary
@@ -122,12 +118,55 @@ class PPO(OnPolicy):
 			self.__name = f'PPO_{repr(self.env)}_{dt.strftime(dt.now(), "%m%d%y_%H%M%S")}'
 		return self.__name
 
-	def learn(self, total_timesteps, callback, log_dir=None):
+	def _init_hparams(self, **kw):
+		# Network structures
+		self.actor_hidden_layers = kw.get('actor_hidden_layers', [200, 200])
+		self.critic_hidden_layers = kw.get('critic_hidden_layers', [200, 100])
+
+		# Data collection
+		self.timesteps_per_batch = kw.get('timesteps_per_batch', 2000)
+		self.max_timesteps_per_episode = kw.get('max_timesteps_per_episode', 100)
+
+		# Return
+		self.gamma = kw.get('gamma', 0.99)
+
+		# Optimization
+		self.actor_optim_type = kw.get('actor_optim_type', SGD)
+		self.critic_optim_type = kw.get('critic_optim_type', Adam)
+		self.n_updates_per_iteration = kw.get('n_updates_per_iteration', 10)
+		self.clip = kw.get('clip', 0.2)
+		self.lr_actor = kw.get('lr_actor', 1e-2)
+		self.lr_init_actor = self.lr_actor
+		self.lr_halflife_actor = kw.get('lr_halflife_actor', int(100e3))
+		self.lr_critic = kw.get('lr_critic', 1e-3)
+
+		# Evaluation
+		self.save_agent_every = kw.get('save_agent_every', 1000)
+		self.eval_agent_every = kw.get('eval_agent_every', 500)
+
+	def get_hparams(self):
+		return dict(
+			actor_hidden_layers = self.actor_hidden_layers,
+			critic_hidden_layers = self.critic_hidden_layers,
+			timesteps_per_batch = self.timesteps_per_batch,
+			max_timesteps_per_episode = self.max_timesteps_per_episode,
+			gamma = self.gamma,
+			actor_optim_type = self.actor_optim_type,
+			critic_optim_type = self.critic_optim_type,
+			n_updates_per_iteration = self.n_updates_per_iteration,
+			clip = self.clip,
+			lr_actor = self.lr_actor,
+			lr_init_actor = self.lr_init_actor,
+			lr_halflife_actor = self.lr_halflife_actor,
+			lr_critic = self.lr_critic
+		)
+
+	def learn(self, total_timesteps, callback, writer):
 		total_timesteps = int(total_timesteps) # just in case
 
 		# Initialize tensorboard writer
-		self.writer = utils.get_writer(log_dir, project_name=repr(self), workspace=COMET_WORKSPACE)
-
+		self.writer = writer
+		self.writer.log_parameters(self.get_hparams())
 		# Initialize callback
 		self._callback = callback
 		self._callback.init_callback(self, self.writer)
@@ -138,11 +177,11 @@ class PPO(OnPolicy):
 		# Training loop
 		t_so_far = 0
 		while t_so_far < total_timesteps:
-			batch_obs, batch_acts, batch_log_probs, batch_rtgs, batch_lens = \
+			batch_obs, batch_acts, _, batch_log_probs, batch_rtgs, batch_lens = \
 				self.rollout(self.timesteps_per_batch, self.max_timesteps_per_episode)
 
 			# Calculate how many timesteps we collected this batch
-			t_so_far += np.sum(batch_lens)
+			t_so_far += t.sum(batch_lens)
 
 			# V_{phi, k}
 			V, _ = self.evaluate(batch_obs, batch_acts)
@@ -187,27 +226,28 @@ class PPO(OnPolicy):
 			actor_loss = np.mean(actor_losses)
 			critic_loss = np.mean(critic_losses)
 			actor_losses, critic_losses = [], []
-			self.writer.add_scalar('train/actor_loss', actor_loss, self.num_timesteps)
-			self.writer.add_scalar('train/critic_loss', critic_loss, self.num_timesteps)
-			self.writer.add_scalar('train/learning_rate_critic', self.lr_critic, self.num_timesteps)
-			self.writer.add_scalar('train/learning_rate_actor', self.lr_actor, self.num_timesteps)
+			self.writer.log_metrics({'train/actor_loss': actor_loss,
+									 'train/critic_loss': critic_loss,
+									 'train/learning_rate_critic': self.lr_critic,
+									 'train/learning_rate_actor': self.lr_actor}, step=self.num_timesteps)
 
 			self.update_learning_rate()
 
 	def get_action(self, o):
-		mean = self.actor(o)
-		dist = MultivariateNormal(mean, self.cov_mat)
-
-		a = dist.sample()
-		log_prob = dist.log_prob(a)
-
-		return a.detach().numpy(), log_prob.detach()
+		a = self.actor(o)
+		return a
 
 	def predict(self,o, deterministic=True):
+		action_mean = self.get_action(o)
 		if deterministic:
-			return self.actor(o).detach().numpy()
+			return action_mean.detach().numpy()
 		else:
-			return self.get_action(o)
+			a_dist = MultivariateNormal(action_mean, self.cov_mat)
+
+			a_sample = a_dist.sample()
+			log_prob = a_dist.log_prob(a_sample)
+
+			return action_mean.detach(), log_prob.detach()
 
 	def evaluate(self, batch_obs, batch_acts):
 		V = self.critic(batch_obs).squeeze()
@@ -218,26 +258,6 @@ class PPO(OnPolicy):
 
 		return V, log_probs
 
-	def _init_hparams(self):
-		# Data collection
-		self.timesteps_per_batch = 2000
-		self.max_timesteps_per_episode = 100
-
-		# Return
-		self.gamma = 0.99
-
-		# Optimization
-		self.actor_optim_type = SGD
-		self.critic_optim_type = Adam
-		self.n_updates_per_iteration = 10
-		self.clip = 0.1
-		self.lr_actor = self.lr_init_actor = 2.5e-4
-		self.lr_halflife_actor = int(200e3)
-		self.lr_critic = 2.5e-4
-
-		# Logging
-		self.logging_freq = 10
-
 	def update_learning_rate(self):
 		# Update exponential decay of actor lr
 		self.lr_actor = self.lr_init_actor * np.exp(-(1/self.lr_halflife_actor) * self.num_timesteps)
@@ -247,36 +267,98 @@ class PPO(OnPolicy):
 				g['lr'] = lr
 
 class TRPO(OnPolicy):
-	def __init__(self, env):
+	def __init__(self, env, **kwargs):
 		"""
 		Based on https://github.com/ajlangley/trpo-pytorch
 
 		:param env: OpenAI environment to learn on
 		"""
-		super(TRPO, self).__init__(env)
+		self.__name = None
+		super(TRPO, self).__init__(env, **kwargs)
+
+		actor_hidden_layers = [200, 200]
+		self.policy = utils.MLP(self.obs_dim, self.act_dim, actor_hidden_layers)
+		self.value_fun = utils.MLP(self.obs_dim, 1, [200, 100])
+
+		# Create actor covariance matrix
+		self.cov_var = t.full(size=(self.act_dim,), fill_value=0.1)  # 0.5 arbitrary
+		self.cov_mat = t.diag(self.cov_var)
+
+		# Initialize optimizers
+		# self.policy_optim = self.policy_optim_type(self.policy.parameters(), lr=self.lr_actor)
+		self.value_optim = self.value_optim_type(self.value_fun.parameters(), lr=self.value_lr)
 
 	def __repr__(self):
 		return f'PPO_{repr(self.env)}_{dt.strftime(dt.now(), "%m%d%y_%H%M%S")}'
 
-	def _init_hparams(self):
-		self.max_kl_div = 0.01				# max kl before and after each step
-		self.max_value_step = 0.01			# lr for value function
-		self.vf_iters = 1					# nb of times to optimize value func over each set of training experiences
-		self.vf_l2_reg_coef = 1e-3			# regularization term when calc. L2 loss of value function
-		self.discount = 0.995				# discount for future rewards
-		self.lam = 0.98						# bias reduction parameter when calculing advantages using GAE
-		self.cg_damping = 1e-3,				# identity matrix multiple to add to Hessian when calc. Hessian-vector prod
-		self.cg_max_iters = 10				# max nb of iterations when solving for optimal search direction
-		self.line_search_coef = 0.9			# proportion by which to reduce step length on each line search iteration
-		self.line_search_max_iter = 10		# max nb of line search iterations before returning 0.0 as step length
-		self.line_search_accept_ratio = 0.1	# min proportion of error to accept from line search linear extrapolation
-		self.model_name = None				# filepaths identifier
+	def _init_hparams(self, **kw):
+		self.timesteps_per_batch = kw.get('timesteps_per_batch', 2000)
+		self.max_timesteps_per_episode = kw.get('max_timesteps_per_episode', 100)
+
+		self.value_optim_type = kw.get('value_optim_type', Adam)
+		self.value_lr = kw.get('value_lr', 1e-3)
+
+		self.max_kl_div = kw.get('max_kl_div', 0.01)		# max kl before and after each step
+		self.max_value_step = kw.get('max_value_step', 0.01)		# lr for value function
+		self.vf_iters = kw.get('vf_iters', 1)		# nb of times to optimize value func over each set of training experiences
+		self.vf_l2_reg_coef = kw.get('vf_l2_reg_coef', 1e-3)		# regularization term when calc. L2 loss of value function
+		self.discount = kw.get('discount', 0.995)		# discount for future rewards
+		self.lam = kw.get('lam', 0.98)		# bias reduction parameter when calculing advantages using GAE
+
+		self.cg_damping = kw.get('cg_damping', 1e-3,)		# identity matrix multiple to add to Hessian when calc. Hessian-vector prod
+		self.cg_max_iters = kw.get('cg_max_iters', 10)		# max nb of iterations when solving for optimal search direction
+
+		self.line_search_coef = kw.get('line_search_coef', 0.9)		# proportion by which to reduce step length on each line search iteration
+		self.line_search_max_iter = kw.get('line_search_max_iter', 10)		# max nb of line search iterations before returning 0.0 as step length
+		self.line_search_accept_ratio = kw.get('line_search_accept_ratio', 0.1)		# min proportion of error to accept from line search linear extrapolation
+		self.model_name = kw.get('model_name', None)		# filepaths identifier
 
 	def learn(self, total_timesteps, callback, log_dir=None):
-		pass
+		total_timesteps = int(total_timesteps)  # just in case
 
-	def get_action(self, state):
-		pass
+		# Initialize tensorboard writer
+		if log_dir is None:
+			log_dir = 'trpo_training'
+		self.writer = utils.get_writer(log_dir, project_name=repr(self), workspace=COMET_WORKSPACE)
+
+		# Initialize callback
+		self._callback = callback
+		self._callback.init_callback(self, self.writer)
+
+		# Logging variables
+		actor_losses, critic_losses = [], []
+
+		# Training loop
+		t_so_far = 0
+		while t_so_far < total_timesteps:
+			batch_obs, batch_acts, batch_rews, batch_log_probs, batch_rtgs, batch_lens = \
+				self.rollout(self.timesteps_per_batch, self.max_timesteps_per_episode)
+			t_so_far += sum(batch_lens)
+
+			# Get advantages from current value function and actual returns
+			advantages = self.get_advantages(batch_obs, batch_rew)
+			# Update policy
+
+			# Update value function
+
+	def get_advantages(self, states, rewards):
+		values = self.value_fun(states)
+		values_next = t.cat([values[:, 1:], t.zeros(values.shape[0]).unsqueeze(1)])
+		td_residuals = rewards + self.discount * values_next - values
+		discount_powers = t.pow(self.discount * self.lam,
+							 t.arange(0, rewards.size(0)).float())
+		discounted_residuals = td_residuals * discount_powers
+		advantages = t.cumsum(discounted_residuals.flip(-1), dim=-1).flip(-1) / discount_powers
+		return advantages
+
+	def get_action(self, o):
+		mean = self.policy(o)
+		dist = MultivariateNormal(mean, self.cov_mat)
+
+		a = dist.sample()
+		log_prob = dist.log_prob(a)
+
+		return a.detach().numpy(), log_prob.detach()
 
 	def predict(self,o, deterministic=True):
 		pass
@@ -363,7 +445,7 @@ def train_my_ppo():
 			shutil.rmtree(path)
 		os.makedirs(path)
 
-	callback = utils.EvalCheckptEarlyStopTrainingCallback(eval_env, save_dir)
+	callback = utils.EvalCheckpointEarlyStopTrainingCallback(eval_env, save_dir, EVAL_FREQ=500, CHKPT_FREQ=1000)
 	agent = PPO(env)
 	agent.learn(nb_training_steps, callback, log_dir)
 

@@ -1,6 +1,6 @@
-import comet_ml
-comet_ml.init(project_name='tensorboardX')
-from tensorboardX import SummaryWriter
+from comet_ml import Experiment
+# comet_ml.init(project_name='tensorboardX')
+# from tensorboardX import SummaryWriter
 COMET_API_KEY = "LvCyhW3NX1yaPPqv3LIMb1qDr"
 
 import os
@@ -13,6 +13,7 @@ import torch as t
 from torch import nn
 import torch.nn.functional as F
 
+def count_parameters(model): return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 class MLP(nn.Module):
 	def __init__(self, in_dim, out_dim, hidden_layers, act_fun=None):
@@ -47,18 +48,22 @@ class MLP(nn.Module):
 		return self.layers[-1](x)
 
 
-class EvalCheckptEarlyStopTrainingCallback():
+class EvalCheckpointEarlyStopTrainingCallback():
 	MAX_EPS = 20  # Number of evaluation episodes to run the latest policy
 	END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES = 5  # self-explanatory
-	SUCCESS_THRESHOLD = 100.0  # Any mean success rate during evaluation greater than this is considered total success
+	SUCCESS_THRESHOLD = 100.0  # Any mean success rate during evaluation >= to this is considered total success
 
 	def __init__(self, env, save_dir, EVAL_FREQ=100, CHKPT_FREQ=1000):
 		"""
-		This callback automatically ends training after
-		:param env:
-		:param save_dir:
-		:param EVAL_FREQ:
-		:param CHKPT_FREQ:
+		This callback automatically ends training after END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES number of
+		consecutive total successes has elapsed. A total success is a success rate >= to SUCCESS_THRESHOLD.
+		The init_callback(.) method needs to be called before anything is done with this callback. Here the agent
+		object is passed so the callback can have access to its parameters.
+		The on_step(.) method logs MAX_EPS trajectories using the agent's latest parameters to choose actions in env.
+		:param env: OpenAI environment
+		:param save_dir: Directory location where to store agent instances.
+		:param EVAL_FREQ: Evaluate MAX_EPS episodes every this value steps.
+		:param CHKPT_FREQ: Save the agent every this value steps.
 		"""
 		self.env = env
 		self.save_dir = save_dir
@@ -75,8 +80,8 @@ class EvalCheckptEarlyStopTrainingCallback():
 
 		self.gamma = 0.99
 		self.discounts = [np.power(self.gamma, i) for i in range(self.env.EPISODE_LENGTH_LIMIT)]
-		self.successes = deque(maxlen=EvalCheckptEarlyStopTrainingCallback.END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES)
-		super(EvalCheckptEarlyStopTrainingCallback, self).__init__()
+		self.successes = deque(maxlen=EvalCheckpointEarlyStopTrainingCallback.END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES)
+		super(EvalCheckpointEarlyStopTrainingCallback, self).__init__()
 
 		self.steps_since_last_animation = 0
 		self.verbose = True
@@ -102,8 +107,6 @@ class EvalCheckptEarlyStopTrainingCallback():
 		self.num_timesteps = self.model.num_timesteps
 
 		if self.num_timesteps % self.EVAL_FREQ == 0:
-			if self.verbose:
-				print(f'-> Training step: {self.num_timesteps}')
 			returns = []
 			ep_lens = []
 			success = []
@@ -139,7 +142,7 @@ class EvalCheckptEarlyStopTrainingCallback():
 
 					ep_rewards.append(r)
 
-				ep_lens.append(step)
+				ep_lens.append(float(step))
 				returns.append(ep_return)
 				rew_final_neg_init.append(ep_rewards[-1] - ep_rewards[0])
 				expected_rew_per_step.append(ep_return / step)
@@ -176,43 +179,41 @@ class EvalCheckptEarlyStopTrainingCallback():
 				self.last_call_step = self.num_timesteps
 
 			if self.verbose:
+				print(f'-> Training step: {self.num_timesteps}')
 				print(f'\t-> Returns: {returns:.2f}')
 				print(f'\t-> Episode length: {ep_lens:.2f}')
 				print(f'\t-> Success rate: {success:.2f}')
 				print(f'\t-> Rew. final - init: {rew_final_neg_init:.5f}')
-				print(f'\t-> Expected rew. per step" {expected_rew_per_step}')
+				print(f'\t-> Expected rew. per step: {expected_rew_per_step}')
 				print(f'\t-> Obs.  \u03BC = {obs_mean:.4f}, \u03C3 = {obs_std:.4f}')
 				print(f'\t-> Act.  \u03BC = {act_mean:.4f}, \u03C3 = {act_std:.4f}')
 				print(f'\t-> Trim. \u03BC = {trim_mean:.4f}, \u03C3 = {trim_std:.4f}')
 				print(f'\t-> FPS = {fps:.2f}')
+				print('')
 
-			for tag, val in zip(('eval/episode_return', 'eval/episode_length', 'eval/success', 'eval/rew_final_neg_init',
-			                     'eval/expected_rew_per_step',
-			                     'spaces/obs_mean', 'spaces/obs_std', 'spaces/act_mean', 'spaces/act_std',
-			                     'spaces/trim_mean', 'spaces/trim_std',
-			                     'train/fps'),
-			                    (returns, ep_lens, success, rew_final_neg_init, expected_rew_per_step,
-			                     obs_mean, obs_std, act_mean, act_std, trim_mean, trim_std, fps)):
-				self.writer.add_scalar(tag, val, self.num_timesteps)
-			# self.logger.dump(self.num_timesteps)
+			self.writer.log_metrics({'eval/episode_return':returns,
+									 'eval/episode_length':ep_lens,
+									 'eval/success': success,
+									 'eval/rew_final_neg_init': rew_final_neg_init,
+									 'eval/expected_rew_per_step': expected_rew_per_step,
+									 'spaces/obs_mean': obs_mean, 'spaces/obs_std': obs_std,
+									 'spaces/act_mean': act_mean, 'spaces/act_std': act_std,
+									 'spaces/trim_mean': trim_mean, 'spaces/trim_std': trim_std,
+									 'train/fps': fps}, step=self.num_timesteps)
+
 			### SAVE SUCCESSFUL AGENTS ###
-			if success > 0:
+			if success > 50.0:
 				self.quick_save()
-				if success >= EvalCheckptEarlyStopTrainingCallback.SUCCESS_THRESHOLD:
+				if success >= EvalCheckpointEarlyStopTrainingCallback.SUCCESS_THRESHOLD:
 					self.successes.append(1)
 				else:
 					self.successes.clear()
 
-				if len(self.successes) >= EvalCheckptEarlyStopTrainingCallback.END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES:
+				if len(self.successes) >= EvalCheckpointEarlyStopTrainingCallback.END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES:
 					return False  # End training
 
 		if self.num_timesteps % self.CHKPT_FREQ == 0:
 			self.quick_save()
-
-		# self.steps_since_last_animation += 1
-		# if self.steps_since_last_animation > 1000:
-		# 	self.steps_since_last_animation = 0
-		# 	self.animation()
 
 		return True
 
@@ -252,9 +253,12 @@ class EvalCheckptEarlyStopTrainingCallback():
 		plt.pause(2)
 		plt.close()
 
-def get_writer(log_dir, project_name, workspace):
-	return SummaryWriter(log_dir=log_dir, comet_config=dict(api_key=COMET_API_KEY,
-															project_name=project_name,
-															workspace=workspace,
-															disabled=False))
 
+def get_writer(experiment_name, project_name, workspace):
+	exp = Experiment(api_key=COMET_API_KEY, project_name=project_name, workspace=workspace)
+	exp.add_tag(experiment_name)
+	return exp
+
+def make_path_exist(dir):
+	if not os.path.exists(dir):
+		os.makedirs(dir)
