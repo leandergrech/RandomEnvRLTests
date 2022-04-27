@@ -4,3 +4,5 @@ __pycache__\
 *.png
 *training_session*
 *.pkl
+*egg-info*
+*events.out.tfevents*
