@@ -17,7 +17,7 @@ DEFAULT_PPO_PARAMS = dict(
 	actor_hidden_layers = [200, 200],
 	critic_hidden_layers = [200, 100],
 	# Data collection
-	timesteps_per_batch = 500,
+	timesteps_per_batch = 2000,
 	max_timesteps_per_episode = RandomEnv.EPISODE_LENGTH_LIMIT,
 	#Return
 	gamma = 0.99,
@@ -26,9 +26,9 @@ DEFAULT_PPO_PARAMS = dict(
 	critic_optim_type = t.optim.Adam,
 	n_updates_per_iteration = 10,
 	clip = 0.2,
-	lr_actor = 5e-4,
-	lr_halflife_actor = int(5e4),
-	lr_critic = 5e-3)
+	lr_actor = 1e-2,
+	lr_halflife_actor = int(1e5),
+	lr_critic = 1e-3)
 
 # '''
 # HYPERPARAMETER GRID SEARCH PPO ON 5X5
@@ -47,11 +47,11 @@ DEFAULT_PPO_PARAMS = dict(
 # for hparam_i, hparam_tuple in enumerate(hparam_set):
 # ppo_params.update(hparam_tuple)
 
-NB_STEPS = int(1e5)
+NB_STEPS = int(5e5)
 EVAL_FREQ = 100
-CHKPT_FREQ = 500
+CHKPT_FREQ = 10000
 
-env_sz = 5
+env_sz = 10
 N_OBS = env_sz
 N_ACT = env_sz
 

@@ -63,5 +63,7 @@ def quick_testing_randomenv():
 	# 	a.legend(loc='best')
 	plt.show()
 
+
 if __name__ == '__main__':
-    quick_testing_randomenv()
+    # quick_testing_randomenv()
+	env = RandomEnv.load_from_dir('common_envs')

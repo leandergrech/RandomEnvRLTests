@@ -1,4 +1,5 @@
 import torch as t
+from my_agents_utils import timeit
 
 arr = t.rand(10000).reshape(1000, 10)
 
@@ -40,14 +41,7 @@ def compute3(batch_rews):
 
 	return t.tensor(batch_rtgs, dtype=t.float).reshape(batch_rews.shape)
 
-from datetime import datetime as dt
-def timeit(func, inputs, number=100):
-	start = dt.now()
-	for _ in range(number):
-		func(*inputs)
-	end = dt.now()
 
-	return end - start
 
 c1_time = timeit(compute1, (arr,))
 print('compute1 time: ', c1_time)

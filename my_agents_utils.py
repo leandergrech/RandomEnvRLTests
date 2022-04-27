@@ -8,10 +8,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime as dt
 from collections import deque
+from functools import partial
 
 import torch as t
 from torch import nn
 import torch.nn.functional as F
+
+def timeit(func, inputs, number=100):
+	start = dt.now()
+	f = partial(func, *inputs)
+	for _ in range(number):
+		out = f()
+	end = dt.now()
+
+	return end - start, out
 
 def count_parameters(model): return sum(p.numel() for p in model.parameters() if p.requires_grad)
 

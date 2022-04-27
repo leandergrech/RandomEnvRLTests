@@ -62,34 +62,57 @@ class OnPolicy(ABC):
 		batch_size = args[0]
 		ep_max_size = args[1]
 
-		K = self.env.max_steps
+		K = ep_max_size
 		B = batch_size // K
 
-		batch_obs = t.zeros((B, K, self.obs_dim))  # batch observations
-		batch_acts = t.zeros((B, K, self.obs_dim))  # batch actions
-		batch_log_probs = t.zeros((B, K))  # log probs of each action
-		batch_rews = t.zeros_like(batch_log_probs)  # batch rewards
-		batch_lens = t.zeros(B)  # episodic lengths in batch
+		# batch_obs = t.zeros(B * K * self.obs_dim)  # batch observations
+		# batch_acts = t.zeros(B * K * self.obs_dim)  # batch actions
+		# batch_log_probs = t.zeros(B * K)  # log probs of each action
+		# batch_rews = t.zeros_like(batch_log_probs)  # batch rewards
+		# batch_lens = t.zeros(B)  # episodic lengths in batch
+		# batch_rtgs
+		batch_obs = []
+		batch_acts = []
+		batch_log_probs = []
+		batch_rews = []
+		batch_lens = []
+		batch_rtgs = []
 
 		for b in range(B):
 			o = self.env.reset()
 			for k in range(K):
 				a, log_prob = self.predict(o, deterministic=False)
-				batch_obs[b,k] = t.tensor(o)
-				o, r, d, _ = self.env.step(a)
-				self._callback.on_step()
+				a = a.detach().numpy().tolist()
+				otp1, r, d, _ = self.env.step(a)
+				if not self._callback.on_step():
+					return None
 				self.num_timesteps += 1
-				batch_acts[b,k] = a
-				batch_log_probs[b,k] = log_prob
-				batch_rews[b,k] = r
-				if d: break
-			batch_lens[b] = k + 1
-		batch_rtgs = self.compute_rtgs(batch_rews)
+				batch_obs.extend(o.tolist())
+				batch_acts.extend(a)
+				batch_rews.append(r)
+				batch_log_probs.append(log_prob)
+				o = otp1
+				if d:
+					break
+			batch_lens.append(k + 1)
+			batch_rtgs.extend(self.compute_rtg_traj(batch_rews[-(k + 1):]))
+		batch_obs = t.tensor(batch_obs)
+		batch_acts = t.tensor(batch_acts)
+		batch_rews = t.tensor(batch_rews)
+		batch_log_probs = t.tensor(batch_log_probs)
+		batch_rtgs = t.tensor(batch_rtgs)
+		batch_lens = t.tensor(batch_lens)
 		return batch_obs, batch_acts, batch_rews, batch_log_probs, batch_rtgs, batch_lens
 
+	def compute_rtg_traj(self, r_traj, discount=None):
+		if discount is None: discount = self.gamma
+		k = len(r_traj)
+		pows = t.pow(discount, t.arange(k))
+		discounted_rews = pows * t.cat([t.tensor(r_traj[1:]), t.tensor([0.0])], dim=-1)
+		return t.cumsum(discounted_rews.flip(-1), dim=-1).flip(-1) / pows
+
 	def compute_rtgs(self, batch_rews, discount=None):
-		if discount is None:
-			discount = self.gamma
+		if discount is None: discount = self.gamma
 		b, k = batch_rews.shape
 		pows = t.pow(discount, t.arange(k))
 		discounted_rews = pows * t.cat([batch_rews[:, 1:], t.zeros(b, 1)], dim=-1)
@@ -106,7 +129,7 @@ class PPO(OnPolicy):
 		self.critic = utils.MLP(self.obs_dim, 1, self.critic_hidden_layers)
 
 		# Create actor covariance matrix
-		self.cov_var = t.full(size=(self.act_dim,), fill_value=0.1) # 0.5 arbitrary
+		self.cov_var = t.full(size=(self.act_dim,), fill_value=0.5) # 0.5 arbitrary
 		self.cov_mat = t.diag(self.cov_var)
 
 		# Initialize optimizers
@@ -115,7 +138,7 @@ class PPO(OnPolicy):
 
 	def __repr__(self):
 		if self.__name is None:
-			self.__name = f'PPO_{repr(self.env)}_{dt.strftime(dt.now(), "%m%d%y_%H%M%S")}'
+			self.__name = f'PPO_{repr(self.env)}'
 		return self.__name
 
 	def _init_hparams(self, **kw):
@@ -177,23 +200,24 @@ class PPO(OnPolicy):
 		# Training loop
 		t_so_far = 0
 		while t_so_far < total_timesteps:
-			batch_obs, batch_acts, _, batch_log_probs, batch_rtgs, batch_lens = \
-				self.rollout(self.timesteps_per_batch, self.max_timesteps_per_episode)
+			batch = self.rollout(self.timesteps_per_batch, self.max_timesteps_per_episode)
+			if batch is None: # end training
+				return
+			batch_obs, batch_acts, _, batch_log_probs, batch_rtgs, batch_lens = batch
 
 			# Calculate how many timesteps we collected this batch
-			t_so_far += t.sum(batch_lens)
+			t_so_far += sum(batch_lens)
 
-			# V_{phi, k}
-			V, _ = self.evaluate(batch_obs, batch_acts)
-
-			# Calculate advantage
-			A_k = batch_rtgs - V.detach()
+			# V_{phi, k} and advantage
+			V = self.get_values(batch_obs).detach()
+			A_k = batch_rtgs - V
 			A_k = (A_k - A_k.mean()) / (A_k.std() + 1e-10) # standardization
 
 			# Optimization loop
 			for _ in range(self.n_updates_per_iteration):
 				# Calculate pi_theta(a_t | s_t)
-				V, curr_log_probs = self.evaluate(batch_obs, batch_acts)
+				V = self.get_values(batch_obs)
+				curr_log_probs = self.get_action_dist(self.get_action(batch_obs)).log_prob(batch_acts)
 
 				# Calculate policy ratios
 				ratios = t.exp(curr_log_probs - batch_log_probs)
@@ -234,29 +258,24 @@ class PPO(OnPolicy):
 			self.update_learning_rate()
 
 	def get_action(self, o):
-		a = self.actor(o)
-		return a
+		return self.actor(o)
 
 	def predict(self,o, deterministic=True):
 		action_mean = self.get_action(o)
 		if deterministic:
 			return action_mean.detach().numpy()
 		else:
-			a_dist = MultivariateNormal(action_mean, self.cov_mat)
-
+			a_dist = self.get_action_dist(action_mean)
 			a_sample = a_dist.sample()
 			log_prob = a_dist.log_prob(a_sample)
 
-			return action_mean.detach(), log_prob.detach()
+			return action_mean, log_prob
 
-	def evaluate(self, batch_obs, batch_acts):
-		V = self.critic(batch_obs).squeeze()
+	def get_action_dist(self, a_mean):
+		return MultivariateNormal(a_mean, self.cov_mat)
 
-		mean = self.actor(batch_obs)
-		dist = MultivariateNormal(mean, self.cov_mat)
-		log_probs = dist.log_prob(batch_acts)
-
-		return V, log_probs
+	def get_values(self, o):
+		return self.critic(o).squeeze()
 
 	def update_learning_rate(self):
 		# Update exponential decay of actor lr

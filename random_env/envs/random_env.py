@@ -18,7 +18,7 @@ class RandomEnv(Env):
 	_UPDATE_SCALING = False
 
 	# Have many times smaller should the average state trim be than an state space bounds
-	TRIM_FACTOR = 10
+	TRIM_FACTOR = 5
 
 	RESET_RANDOM_WALK_STEPS = 50 # Reset func starts from optimal state, and walks randomly for these amount of steps
 	SAVED_MODEL_SUFFIX = '_dynamics.pkl'
@@ -107,7 +107,8 @@ class RandomEnv(Env):
 
 		return self.current_state, r, done, dict(success=success)
 
-	def objective(self, state):
+	@staticmethod
+	def objective(state):
 		# state_reward = -np.sum(np.square(state)) / self.obs_dimension
 		state_reward = -np.sqrt(np.mean(np.square(state)))
 		return state_reward * RandomEnv.REWARD_SCALE
@@ -122,12 +123,12 @@ class RandomEnv(Env):
 			done = True
 		return done, success
 
-	def get_optimal_action(self, state):
-		# clip = 0.5
-		# state = np.clip(state, -clip, clip)
+	def get_optimal_action(self, state, state_clip=None):
+		if state_clip:
+			state = np.clip(state, -state_clip, state_clip)
+		self.prev_error = np.copy(state)   # in case integral controller is used as well
+
 		action = -self.pi.dot(RandomEnv.K_p * state + RandomEnv.K_i * self.prev_error)
-		self.prev_error = np.copy(state)
-		# return np.divide(action, RandomEnv.ACTION_SCALE)
 		return action / max([1.0, max(abs(action))])  # linearly scaled response to fit within [-1, 1]
 
 	@property
