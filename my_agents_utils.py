@@ -26,7 +26,7 @@ def timeit(func, inputs, number=100):
 def count_parameters(model): return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 class MLP(nn.Module):
-	def __init__(self, in_dim, out_dim, hidden_layers, act_fun=None):
+	def __init__(self, in_dim, out_dim, hidden_layers, act_fun=None, dtype=None):
 		"""
 		Instantiates a 1D multi-layered perceptron with dense connections. Multi-layer with hidden functions passed
 		through act_fun and a linear last layer.
@@ -40,24 +40,27 @@ class MLP(nn.Module):
 			self.act_fun = F.relu
 		else:
 			self.act_fun = act_fun
+		if dtype is None:
+			dtype = t.float
+		self.dtype = dtype
 
 		layer_input_sizes = np.concatenate([[in_dim], hidden_layers])
 		layer_output_sizes = np.concatenate([hidden_layers, [out_dim]])
 		layers = []
 		for in_sz, out_sz in zip(layer_input_sizes, layer_output_sizes):
-			layers.append(nn.Linear(in_sz, out_sz))
+			layers.append(nn.Linear(in_sz, out_sz, dtype=dtype))
 		self.layers = nn.ModuleList(layers)
 
 	def forward(self, x):
 		if not isinstance(x, t.Tensor):
-			x = t.tensor(x, dtype=t.float)
+			x = t.tensor(x, dtype=self.dtype)
 
 		for l in self.layers[:-1]:
 			x = self.act_fun(l(x))
 
 		return self.layers[-1](x)
 
-
+# from stable_baselines3.common.callbacks import BaseCallback
 class EvalCheckpointEarlyStopTrainingCallback():
 	MAX_EPS = 20  # Number of evaluation episodes to run the latest policy
 	END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES = 5  # self-explanatory
@@ -95,6 +98,9 @@ class EvalCheckpointEarlyStopTrainingCallback():
 
 		self.steps_since_last_animation = 0
 		self.verbose = True
+
+	def __call__(self, *args, **kwargs):
+		pass
 
 	def quick_save(self, suffix=None):
 		if suffix is None:
@@ -272,3 +278,12 @@ def get_writer(experiment_name, project_name, workspace):
 def make_path_exist(dir):
 	if not os.path.exists(dir):
 		os.makedirs(dir)
+
+def compute_returns(r_traj, DISCOUNT=0.99):
+	r_traj = t.tensor(r_traj, dtype=t.double)
+	k = len(r_traj)
+	pows = t.pow(t.tensor(DISCOUNT, dtype=t.double), t.arange(k))
+	discounted_rews = pows * t.cat([t.tensor(r_traj[1:]), t.tensor([0.0], dtype=t.float64)], dim=-1)
+	discounted_rets = t.cumsum(discounted_rews.flip(-1), dim=-1).flip(-1) / pows
+
+	return discounted_rets.detach().numpy()

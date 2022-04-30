@@ -296,8 +296,9 @@ class TRPO(OnPolicy):
 		super(TRPO, self).__init__(env, **kwargs)
 
 		actor_hidden_layers = [200, 200]
+		critic_hidden_layers = [200, 100]
 		self.policy = utils.MLP(self.obs_dim, self.act_dim, actor_hidden_layers)
-		self.value_fun = utils.MLP(self.obs_dim, 1, [200, 100])
+		self.value_fun = utils.MLP(self.obs_dim, 1, critic_hidden_layers)
 
 		# Create actor covariance matrix
 		self.cov_var = t.full(size=(self.act_dim,), fill_value=0.1)  # 0.5 arbitrary
@@ -355,7 +356,7 @@ class TRPO(OnPolicy):
 			t_so_far += sum(batch_lens)
 
 			# Get advantages from current value function and actual returns
-			advantages = self.get_advantages(batch_obs, batch_rew)
+			advantages = self.get_advantages(batch_obs, batch_rews)
 			# Update policy
 
 			# Update value function
