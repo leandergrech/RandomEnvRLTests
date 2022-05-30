@@ -10,3 +10,4 @@ __pycache__\
 /random_env_modelling/re_trajs/
 *.zip
 *.csv
+*.txt
