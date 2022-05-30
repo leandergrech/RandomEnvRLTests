@@ -1,69 +1,21 @@
-from comet_ml import Experiment
-# comet_ml.init(project_name='tensorboardX')
-# from tensorboardX import SummaryWriter
-COMET_API_KEY = "LvCyhW3NX1yaPPqv3LIMb1qDr"
-
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 from datetime import datetime as dt
 from collections import deque
-from functools import partial
-
+import comet_ml
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 import torch as t
-from torch import nn
-import torch.nn.functional as F
 
-def timeit(func, inputs, number=100):
-	start = dt.now()
-	f = partial(func, *inputs)
-	for _ in range(number):
-		out = f()
-	end = dt.now()
+from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import BaseCallback
+from sb3_contrib import TRPO
+from random_env.envs import RandomEnv, RunningStats
+from my_agents_utils import make_path_exist, get_writer, count_parameters
 
-	return end - start, out
-
-def count_parameters(model): return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-class MLP(nn.Module):
-	def __init__(self, in_dim, out_dim, hidden_layers, act_fun=None, dtype=None):
-		"""
-		Instantiates a 1D multi-layered perceptron with dense connections. Multi-layer with hidden functions passed
-		through act_fun and a linear last layer.
-		:param in_dim: Input dimension
-		:param out_dim: Output dimension
-		:param hidden_layers: List of integers - size of each hidden layer
-		:param act_fun: Activation function for hidden layers
-		"""
-		super(MLP, self).__init__()
-		if act_fun is None:
-			self.act_fun = F.relu
-		else:
-			self.act_fun = act_fun
-		if dtype is None:
-			dtype = t.float
-		self.dtype = dtype
-
-		layer_input_sizes = np.concatenate([[in_dim], hidden_layers])
-		layer_output_sizes = np.concatenate([hidden_layers, [out_dim]])
-		layers = []
-		for in_sz, out_sz in zip(layer_input_sizes, layer_output_sizes):
-			layers.append(nn.Linear(in_sz, out_sz, dtype=dtype))
-		self.layers = nn.ModuleList(layers)
-
-	def forward(self, x):
-		if not isinstance(x, t.Tensor):
-			x = t.tensor(x, dtype=self.dtype)
-
-		for l in self.layers[:-1]:
-			x = self.act_fun(l(x))
-
-		return self.layers[-1](x)
-
-# from stable_baselines3.common.callbacks import BaseCallback
-class EvalCheckpointEarlyStopTrainingCallback():
+CUR_EXP_IDX = 0
+class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
 	MAX_EPS = 20  # Number of evaluation episodes to run the latest policy
-	END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES = 5  # self-explanatory
+	END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES = 2  # self-explanatory
 	SUCCESS_THRESHOLD = 100.0  # Any mean success rate during evaluation >= to this is considered total success
 
 	def __init__(self, env, save_dir, EVAL_FREQ=100, CHKPT_FREQ=1000):
@@ -111,15 +63,11 @@ class EvalCheckpointEarlyStopTrainingCallback():
 		if self.verbose > 1:
 			print("Saving model checkpoint to {}".format(save_path))
 
-		# self.model.save(save_path)
-		if self.verbose > 0:
-			print(f'Model NOT saved to: {save_path}')
+		self.model.save(save_path)
+		# if self.verbose > 0:
+		# 	print(f'Model NOT saved to: {save_path}')
 
-	def init_callback(self, model, writer):
-		self.model = model
-		self.writer = writer
-
-	def on_step(self):
+	def _on_step(self):
 		self.num_timesteps = self.model.num_timesteps
 
 		if self.num_timesteps % self.EVAL_FREQ == 0:
@@ -144,7 +92,7 @@ class EvalCheckpointEarlyStopTrainingCallback():
 				step = 0
 				d = False
 				while not d:
-					a = self.model.predict(o, deterministic=True)
+					a = self.model.predict(o, deterministic=True)[0]
 					step += 1
 
 					o2, r, d, _ = self.env.step(a)
@@ -195,7 +143,8 @@ class EvalCheckpointEarlyStopTrainingCallback():
 				self.last_call_step = self.num_timesteps
 
 			if self.verbose:
-				print(f'-> Training step: {self.num_timesteps}')
+				global CUR_EXP_IDX
+				print(f'-> Experiment #{CUR_EXP_IDX} training step: {self.num_timesteps}')
 				print(f'\t-> Returns: {returns:.2f}')
 				print(f'\t-> Episode length: {ep_lens:.2f}')
 				print(f'\t-> Success rate: {success:.2f}')
@@ -207,7 +156,7 @@ class EvalCheckpointEarlyStopTrainingCallback():
 				print(f'\t-> FPS = {fps:.2f}')
 				print('')
 
-			self.writer.log_metrics({'eval/episode_return':returns,
+			self.logger.log_metrics({'eval/episode_return':returns,
 									 'eval/episode_length':ep_lens,
 									 'eval/success': success,
 									 'eval/rew_final_neg_init': rew_final_neg_init,
@@ -233,68 +182,156 @@ class EvalCheckpointEarlyStopTrainingCallback():
 
 		return True
 
-	def animation(self):
-		fig, (ax1, ax2) = plt.subplots(2)
-		fig.suptitle(f'Evaluation at training step: {self.num_timesteps}')
-		plt.ion()
+COMET_WORKSPACE = 'testing-ppo-trpo'
+algo = 'TRPO'
 
-		o1 = self.env.reset()
+if 'PPO' in algo:
+	# '''
+	# HYPERPARAMETER GRID SEARCH PPO ON 5X5
+	# '''
+	# hparam_search_dict = dict(ent_coef=(0.01, 0.0),
+	#                           vf_coef=(0.5, 1.0),
+	#                           learning_rate=(1e-4, 1e-5),
+	#                           n_steps=(100, 500),
+	#                           batch_size=(64, 256))
+	# keys, values = [], []
+	# for k, v in hparam_search_dict.items():
+	# 	keys.append(k)
+	# 	values.append(v)
+	# hparam_set = [{k: v for k, v in zip(keys, htuple)} for htuple in product(*values)]
 
-		for ax in fig.axes:
-			ax.axhline(0.0, color='k', ls='--')
-			ax.grid(which='both', color='gray')
+	# for hparam_i, hparam_tuple in enumerate(hparam_set):
+	# ppo_params.update(hparam_tuple)
+	DEFAULT_PARAMS = dict(
+		policy='MlpPolicy',
+		learning_rate=3e-4,
+		n_steps=2048,
+		batch_size=64,
+		n_epochs=10,
+		gamma=0.99,
+		gae_lambda=0.95,
+		clip_range=0.2,
+		clip_range_vf=None,
+		normalize_advantage=True,
+		ent_coef=0.0,
+		vf_coef=0.5,
+		max_grad_norm=0.5,
+		use_sde=False,
+		sde_sample_freq=- 1,
+		target_kl=None,
+		tensorboard_log=None,
+		create_eval_env=False,
+		policy_kwargs=None,
+		verbose=0,
+		seed=None,
+		device='auto',
+		_init_setup_model=True)
+elif 'TRPO' in algo:
+	DEFAULT_PARAMS = dict(
+		policy='MlpPolicy',
+		learning_rate=0.001,
+		n_steps=2048,
+		batch_size=128,
+		gamma=0.99,
+		cg_max_steps=15,
+		cg_damping=0.1,
+		line_search_shrinking_factor=0.8,
+		line_search_max_iter=10,
+		n_critic_updates=10,
+		gae_lambda=0.95,
+		use_sde=False,
+		sde_sample_freq=- 1,
+		normalize_advantage=True,
+		target_kl=0.01,
+		sub_sampling_factor=1,
+		tensorboard_log=None,
+		create_eval_env=False,
+		policy_kwargs=None,
+		verbose=0,
+		seed=None,
+		device='auto',
+		_init_setup_model=True
+	)
 
-		oline, = ax1.plot(o1)
-		ax1.set_title('Observation')
 
-		aline, = ax2.plot(np.zeros(self.env.act_dimension))
-		ax2.set_title('Action')
+NB_STEPS = int(7e6)
+EVAL_FREQ = 2000
+CHKPT_FREQ = 50000
 
-		fig.tight_layout()
+params = DEFAULT_PARAMS.copy()
+session_name = dt.strftime(dt.now(), f'sess_{algo.lower()}_%m%d%y_%H%M%S')
+par_dir = os.path.join('sb3_randomenv_training', session_name)
+save_dir = os.path.join(par_dir, 'saves')
+log_dir = os.path.join(par_dir, 'logs')
+for d in (save_dir, log_dir):
+	make_path_exist(d)
 
-		d = False
-		new_ylim = lambda ax, ydat: (np.min(np.concatenate([ax.get_ylim(), ydat])),
-		                             np.max(np.concatenate([ax.get_ylim(), ydat])))
-		while not d:
-			a = self.model.predict(o1, deterministic=True)[0]
-			o2, r, d, _ = self.env.step(a)
 
-			oline.set_ydata(np.copy(o2))
-			aline.set_ydata(np.copy(a))
+for env_sz in np.arange(2, 11):
+	N_OBS = env_sz
+	N_ACT = env_sz
 
-			ax1.set_ylim(new_ylim(ax1, o2))
-			ax2.set_ylim(new_ylim(ax2, a))
-			plt.pause(0.01)
-			o1 = o2
-		plt.pause(2)
-		plt.close()
+	for ENV_RANDOM_SEED in (123, 234, 345, 456, 567):
+		t.manual_seed(ENV_RANDOM_SEED)
+		np.random.seed(ENV_RANDOM_SEED)
 
-class ExperimentWrapper(Experiment):
-	def __init__(self, *args, **kwargs):
-		super(ExperimentWrapper, self).__init__(*args, **kwargs)
+		'''Create environments with same dynamics for diff agents'''
+		env = RandomEnv(N_OBS, N_ACT, estimate_scaling=True)
 
-	def record(self, tag, val, step=None, **kwargs):
-		if 'exclude' in kwargs:
-			return None
-		return self.log_parameters({tag:val}, step=step)
+		for POLICY_RANDOM_SEED in (678, 789, 890, 901, 112):
+			params = DEFAULT_PARAMS.copy()
+			params['env'] = env
 
-	def dump(self, *args, **kwargs):
-		pass
+			'''Set seed to random generators'''
+			t.manual_seed(POLICY_RANDOM_SEED)
+			np.random.seed(POLICY_RANDOM_SEED)
 
-def get_writer(experiment_name, project_name, workspace):
-	exp = ExperimentWrapper(api_key=COMET_API_KEY, project_name=project_name, workspace=workspace)
-	exp.add_tag(experiment_name)
-	return exp
+			params['seed'] = POLICY_RANDOM_SEED
 
-def make_path_exist(dir):
-	if not os.path.exists(dir):
-		os.makedirs(dir)
+			eval_env = RandomEnv(N_OBS, N_ACT, model_info=env.model_info)
 
-def compute_returns(r_traj, DISCOUNT=0.99):
-	r_traj = t.tensor(r_traj, dtype=t.double)
-	k = len(r_traj)
-	pows = t.pow(t.tensor(DISCOUNT, dtype=t.double), t.arange(k))
-	discounted_rews = pows * t.cat([t.tensor(r_traj[1:]), t.tensor([0.0], dtype=t.float64)], dim=-1)
-	discounted_rets = t.cumsum(discounted_rews.flip(-1), dim=-1).flip(-1) / pows
+			'''Name agent (model) and create sub dir required for saving'''
+			# model_name = f'{algo}_' + repr(env) + f'_seed{RANDOM_SEED}'
+			model_name = f'{algo}_' + repr(env) + f'_env-seed{ENV_RANDOM_SEED}_policy-seed{POLICY_RANDOM_SEED}'
 
-	return discounted_rets.detach().numpy()
+			'''Agent'''
+			if 'PPO' in algo:
+				model = PPO(**params)
+			elif 'TRPO' in algo:
+				model = TRPO(**params)
+			# print(f'-> Policy nb. of parameters: {count_parameters(model.actor)}')
+
+			# put them here cos otherwise RL agent gives unexpected keyword error
+			params['policy_seed'] = POLICY_RANDOM_SEED
+			params['env_seed'] = ENV_RANDOM_SEED
+			params['n_obs'] = N_OBS
+			params['n_act'] = N_ACT
+
+			'''Make model path and save env dynamincs copy there'''
+			model_dir = os.path.join(save_dir, model_name)
+			make_path_exist(model_dir)
+			env.save_dynamics(model_dir)
+
+			'''Callback evaluated agent every EVAL_FREQ steps and saved best model, and auto-saves every CHKPT_FREQ steps'''
+			eval_callback = EvalCheckpointEarlyStopTrainingCallback(env=eval_env, save_dir=model_dir,
+																	EVAL_FREQ=EVAL_FREQ, CHKPT_FREQ=CHKPT_FREQ)
+			writer = get_writer(model_name, session_name, COMET_WORKSPACE)
+			model.set_logger(writer)
+			# eval_callback.init_callback(model, writer)
+
+			writer.log_parameters(params)
+
+			'''Log some more info and save it in the same directory as the agent'''
+			with open(os.path.join(log_dir, 'info.txt'), 'w') as f:
+				'''Log hyperparameters used in this experiment'''
+				f.write(f'-> {algo} parameters\n')
+				for k, v in params.items():
+					f.write(f'\t-> {k} = {v}\n')
+
+			'''Start training'''
+			model.learn(total_timesteps=NB_STEPS, callback=eval_callback)
+
+
+			CUR_EXP_IDX += 1
+
+
