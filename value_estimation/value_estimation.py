@@ -100,16 +100,14 @@ for ep in range(N_EPS):
 	l_list.append(step+1)
 
 print(f'average ep_len={np.mean(l_list):.2f} +/- {np.std(l_list):2f}')
-fig, (ax1, ax2, ax3) = plt.subplots(3)
+fig, _ = plt.subplots(3, 2)
 
-for ax, dat, lab in zip(fig.axes, (invA, b), ())
-ax1.plot(np.array(traj_invA).reshape(-1, sz*sz))
-ax1.set_title('invA')
-ax1.set_yscale('symlog')
-ax2.plot(traj_b)
-ax2.set_title('b')
-ax3.plot(traj_w)
-ax3.set_title('w')
+for ax, dat, lab in zip(fig.axes,
+						(np.array(traj_invA).reshape(-1, sz*sz), traj_b, traj_w, traj_v, traj_num, traj_den),
+						('invA', 'b', 'w', 'v', 'num', 'den')):
+	ax.plot(dat, label=lab)
+	ax.legend(loc='upper right')
+
 fig.tight_layout()
 
 fig2, (ax1, ax2, ax3) = plt.subplots(3)
