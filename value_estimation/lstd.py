@@ -34,12 +34,17 @@ def generate_trajectory(env, policy, n_eps):
 	return dict(obs=o_list, act=a_list, obstp1=otp1_list, rew=r_list, eplen=l_list)
 
 sz = 3
-env = RandomEnv(sz, sz, estimate_scaling=True)
-N_EPS = 1
-MAX_STEPS = env.max_steps
-GAMMA = 0.9
+rm=np.diag(np.ones(sz))
+pi=rm.copy()
+env = RandomEnv(sz, sz, estimate_scaling=False)
+env.rm = rm
+env.pi = pi
 
-eps = 1e-1
+N_EPS = 5
+MAX_STEPS = env.max_steps
+GAMMA = 1.0
+
+eps = 1e-8
 
 """
 LSTD algorithm Sutton&Barto p.230
@@ -57,11 +62,17 @@ a_traj = []
 o_traj = []
 r_traj = []
 
-invA = (1/eps) * np.diag(np.ones(sz))
-b = np.zeros(sz)
-
 policy = lambda s: 0.2 * env.get_optimal_action(s)
-get_features = lambda s: np.copy(s)
+def get_features(s):
+	x1 = s.copy()
+	x2 = np.multiply(x1[:-1], x1[1:])
+	# return x1
+	# x2 = np.square(s)
+	return np.concatenate([x1, x2])
+
+d = len(get_features(np.zeros(sz)))
+invA = (1/eps) * np.diag(np.ones(d))
+b = np.zeros(d)
 
 for ep in range(N_EPS):
 	o = env.reset()
@@ -72,15 +83,15 @@ for ep in range(N_EPS):
 		xtp1 = get_features(otp1)
 
 		rhs = x - GAMMA * xtp1
-		v = invA.T.dot(rhs)
+		v = invA.T@rhs
 
-		num = invA.dot(x).dot(v.T)
-		den = 1 + v.T.dot(x)
+		num = (invA@x)@(v.T)
+		den = 1 + (v.T)@x
 		invA = invA - num/den
 
 		b = b + r * x
 
-		w = invA.dot(b)
+		w = invA@b
 
 		traj_invA.append(invA.copy())
 		traj_b.append(b.copy())
@@ -101,9 +112,8 @@ for ep in range(N_EPS):
 
 print(f'average ep_len={np.mean(l_list):.2f} +/- {np.std(l_list):2f}')
 fig, _ = plt.subplots(3, 2)
-
 for ax, dat, lab in zip(fig.axes,
-						(np.array(traj_invA).reshape(-1, sz*sz), traj_b, traj_w, traj_v, traj_num, traj_den),
+						(np.array(traj_invA).reshape(-1, d*d), traj_b, traj_w, traj_v, traj_num, traj_den),
 						('invA', 'b', 'w', 'v', 'num', 'den')):
 	ax.plot(dat, label=lab)
 	ax.legend(loc='upper right')
@@ -111,12 +121,11 @@ for ax, dat, lab in zip(fig.axes,
 fig.tight_layout()
 
 fig2, (ax1, ax2, ax3) = plt.subplots(3)
-ax1.plot(o_traj)
-ax1.set_title('o')
-ax2.plot(a_traj)
-ax2.set_title('a')
-ax3.plot(r_traj)
-ax3.set_title('r')
+for ax, dat, lab in zip(fig2.axes,
+                        (o_traj, a_traj, r_traj),
+                        ('o','a','r')):
+	ax.plot(dat, label=lab)
+	ax.legend(loc='upper right')
 fig2.tight_layout()
 
 l_marker_pos = np.cumsum(l_list)
