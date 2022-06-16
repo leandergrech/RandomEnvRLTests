@@ -9,6 +9,7 @@ from gym.spaces import Box
 from scipy import stats
 import pickle as pkl
 
+
 class RandomEnv(Env):
 	EPISODE_LENGTH_LIMIT = 100
 	REWARD_DEQUE_SIZE = 1 #5
@@ -67,7 +68,7 @@ class RandomEnv(Env):
 		self.verbose = False
 
 	def __repr__(self):
-		"""Don't change this anymore, need is for static_method load_from_dir"""
+		"""Don't change this anymore, need it for static_method load_from_dir"""
 		return f'RandomEnv_{self.obs_dimension}obsx{self.act_dimension}act'
 
 	def reset(self, init_state=None):
