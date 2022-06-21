@@ -18,6 +18,7 @@ class RandomEnvDiscreteActions(RandomEnv):
         super(RandomEnvDiscreteActions, self).__init__(*args, **kwargs)
         self.action_space = gym.spaces.MultiDiscrete(np.repeat(3, self.act_dimension))
         self.cum_action = None
+        self.REWARD_SCALE = 1.
 
     def __repr__(self):
         return f'RandomEnvDiscreteActions_{self.obs_dimension}obsx{self.act_dimension}act'
@@ -30,7 +31,8 @@ class RandomEnvDiscreteActions(RandomEnv):
         """
         :param action: Array of size self.act_dimension. Each action can be one of (0,1,2) - to index self.AVAIL_MOM
         """
-        self.cum_action += (action - 1) * self.ACTION_EPS
+        delta_action = (np.array(action) - 1) * self.ACTION_EPS
+        self.cum_action += delta_action
         return super(RandomEnvDiscreteActions, self).step(self.cum_action)
 
     def get_optimal_action(self, *args, **kwargs):

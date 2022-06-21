@@ -13,7 +13,6 @@ import pickle as pkl
 class RandomEnv(Env):
 	EPISODE_LENGTH_LIMIT = 100
 	REWARD_DEQUE_SIZE = 1 #5
-	REWARD_SCALE = 0.05
 	ACTION_SCALE = 1.0  # set to one during dynamic output scale adjustment test
 	GOAL = 0.1  # state threshold boundary
 	_UPDATE_SCALING = False
@@ -36,6 +35,8 @@ class RandomEnv(Env):
 		:param seed:
 		"""
 		super(RandomEnv, self).__init__()
+		self.REWARD_SCALE = 0.05
+
 		self.obs_dimension, self.act_dimension = n_obs, n_act
 
 		''' State and action space'''
@@ -108,11 +109,11 @@ class RandomEnv(Env):
 
 		return self.current_state, r, done, dict(success=success)
 
-	@staticmethod
-	def objective(state):
+	# @staticmethod
+	def objective(self, state):
 		# state_reward = -np.sum(np.square(state)) / self.obs_dimension
 		state_reward = -np.sqrt(np.mean(np.square(state)))
-		return state_reward * RandomEnv.REWARD_SCALE
+		return state_reward * self.REWARD_SCALE
 
 	def _is_done(self):
 		done, success = False, False
