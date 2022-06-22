@@ -78,7 +78,10 @@ class QValueFunction:
         self.lr = lr
         state_sizes = [tuple(len(splits) + 1 for splits in tiling)
                             for tiling in self.tilings]
-        self.q_tables = np.array([np.zeros(shape=(state_size + (len(self.actions),)))
+        # self.q_tables = np.array([np.zeros(shape=(state_size + (len(self.actions),)))
+        #                  for state_size in state_sizes])
+        # Initialize to random Q-values
+        self.q_tables = np.array([-np.random.rand(*(state_size + (len(self.actions),)))
                          for state_size in state_sizes])
 
     def value(self, state, action):

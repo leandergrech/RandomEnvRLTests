@@ -3,10 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import trange
 
-from tile_coding_re.tile_coding import QValueFunction
-from tile_coding_re.utils import TrajSimple, TrajBuffer
+from tile_coding_re.mc_method.tile_coding import QValueFunction
+from tile_coding_re.mc_method.utils import TrajSimple, TrajBuffer
+from tile_coding_re.mc_method.constants import *
+
 from random_env.envs import RandomEnvDiscreteActions
-from constants import *
 
 load_path = os.path.join(par_dir, 'saves')
 

@@ -1,0 +1,13 @@
+N_OBS, N_ACT = 2, 2
+NB_BINS = 5
+NB_TILINGS = 5
+
+NB_TRAINING_EPS = 100
+# NB_INIT_STEPS = 1000
+EVAL_EVERY = 1
+
+GAMMA = 0.95
+GREEDY_EPS = 0.1
+LR = 0.05
+
+par_dir = f'REDA_{N_OBS}obsx{N_ACT}act_{NB_BINS}bins_{NB_TILINGS}tilings_{LR}lr_{GREEDY_EPS}eps-greedy_{GAMMA}gamma'

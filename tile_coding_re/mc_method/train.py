@@ -1,17 +1,15 @@
 import os
 import shutil
 
-from itertools import product
-
 import numpy as np
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
-from tile_coding_re.tile_coding import get_tilings_from_env, QValueFunction
-from tile_coding_re.utils import TrajBuffer
-from constants import *
+from tile_coding_re.mc_method.tile_coding import get_tilings_from_env, QValueFunction
+from tile_coding_re.mc_method.utils import TrajBuffer
+from tile_coding_re.mc_method.constants import *
 
 """
 Epsilon-greedy on-policy MC method
-Experience divided into episodes and all episodes terminate.
+Experience divided into episodes and all episodes terminate
 """
 
 '''
