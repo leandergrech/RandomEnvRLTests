@@ -1,1 +1,8 @@
 ![](REDA_2obsx2act.png?raw=true)
+![](REDA_3obsx3act.png?raw=true)
+![](REDA_4obsx4act.png?raw=true)
+![](REDA_5obsx5act.png?raw=true)
+![](REDA_6obsx6act.png?raw=true)
+![](REDA_7obsx7act.png?raw=true)
+![](REDA_8obsx9act.png?raw=true)
+![](REDA_9obsx9act.png?raw=true)
