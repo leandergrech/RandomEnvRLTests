@@ -1,6 +1,12 @@
+from itertools import product
 import gym
 import numpy as np
 from random_env.envs import RandomEnv
+
+
+def get_discrete_actions(n_act):
+    all_actions = [list(item) for item in product(*np.repeat([[0, 1, 2]], n_act, axis=0))]
+    return all_actions
 
 
 class RandomEnvDiscreteActions(RandomEnv):
@@ -21,7 +27,7 @@ class RandomEnvDiscreteActions(RandomEnv):
         self.REWARD_SCALE = 1.
 
     def __repr__(self):
-        return f'RandomEnvDiscreteActions_{self.obs_dimension}obsx{self.act_dimension}act'
+        return f'REDA_{self.obs_dimension}obsx{self.act_dimension}act'
 
     def reset(self, init_state=None):
         self.cum_action = np.zeros(self.act_dimension)

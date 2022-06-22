@@ -52,6 +52,22 @@ def get_tile_coding(feature, tilings):
     return np.array(feature_codings)
 
 
+def get_tilings_from_env(env, nb_tilings, nb_bins):
+    n_obs = env.obs_dimension
+
+    ranges = [[lo, hi] for lo, hi in zip(env.observation_space.low, env.observation_space.high)]
+    range_size = abs(np.subtract(*ranges[0]))
+
+    bins = np.tile(nb_bins, (nb_tilings, n_obs))
+
+    available_offsets = np.linspace(0, range_size / nb_bins, nb_tilings + 1)[:-1]  # symmetrical tiling offsets
+    offsets = np.repeat(available_offsets, n_obs).reshape(-1, n_obs)
+
+    tilings = create_tilings(ranges, nb_tilings, bins, offsets)
+
+    return tilings
+
+
 class QValueFunction:
     def __init__(self, tilings, actions, lr):
         self.tilings = tilings
@@ -108,38 +124,6 @@ class QValueFunction:
         qvf.q_tables = npz_archive['q_tables']
         return qvf
 
-
-class TrajBuffer:
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.o = []
-        self.a = []
-        self.r = []
-        self.g = []
-
-    def __bool__(self):
-        if self.o:
-            return True
-        else:
-            return False
-
-    def add(self, state, action, reward):
-        self.o.append(state.copy())
-        self.a.append(action.copy())
-        self.r.append(reward)
-
-    def get_undiscounted_returns(self):
-        return np.flip(np.cumsum(np.flip(self.r))).tolist()
-
-    def pop_target_tuple(self):
-        if not self.g:
-            self.g = self.get_undiscounted_returns()
-
-        o = self.o.pop(0)
-        a = self.a.pop(0)
-        g = self.g.pop(0)
-
-        return o, a, g
-
+    def greedy_action(self, state):
+        q_vals = [self.value(state, a_) for a_ in self.actions]
+        return self.actions[np.argmax(q_vals)]

@@ -4,9 +4,15 @@ import shutil
 from itertools import product
 
 import numpy as np
-from random_env.envs import RandomEnvDiscreteActions
-from tile_coding_re.tile_coding import create_tilings, QValueFunction, TrajBuffer
+from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
+from tile_coding_re.tile_coding import get_tilings_from_env, QValueFunction
+from tile_coding_re.utils import TrajBuffer
 from constants import *
+
+"""
+Epsilon-greedy on-policy MC method
+Experience divided into episodes and all episodes terminate.
+"""
 
 '''
 Create RE to train on
@@ -16,17 +22,12 @@ env = RandomEnvDiscreteActions(n_obs=N_OBS, n_act=N_ACT)
 '''
 Create tilings
 '''
-ranges = [[lo, hi] for lo, hi in zip(env.observation_space.low, env.observation_space.high)]
-bins = np.tile(NB_BINS, (NB_TILINGS, N_OBS))
-range_size = abs(np.subtract(*ranges[0]))
-available_offsets = np.linspace(0, range_size/NB_BINS, NB_TILINGS + 1)[:-1] # symmetrical tiling offsets
-offsets = np.repeat(available_offsets, N_OBS).reshape(-1, N_OBS)
-tilings = create_tilings(ranges, NB_TILINGS, bins, offsets)
+tilings = get_tilings_from_env(env, NB_TILINGS, NB_BINS)
 
 '''
 Create tabular Q-function
 '''
-all_actions = [list(item) for item in product(*np.repeat([[0, 1, 2]], N_ACT, axis=0))]
+all_actions = get_discrete_actions(N_ACT)
 qvf = QValueFunction(tilings, all_actions, lr=LR)
 
 '''
@@ -60,9 +61,8 @@ for ep in range(NB_TRAINING_EPS):
         if np.random.rand() < GREEDY_EPS or T < NB_INIT_STEPS:
             a = env.action_space.sample()
         else:
-            # Q-learning - greedy selection of action with the largest value
-            vals = [qvf.value(o, a_) for a_ in all_actions]     # evaluate all actions first
-            a = all_actions[np.argmax(vals)]
+            # greedy selection of action with the largest value
+            a = qvf.greedy_action(o)
 
         otp1, r, d, _ = env.step(a)
         buffer.add(o, a, r)
