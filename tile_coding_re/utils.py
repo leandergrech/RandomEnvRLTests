@@ -93,3 +93,23 @@ class TrajBuffer:
     @property
     def g(self):
         return self.g_
+
+
+if __name__ == '__main__':
+    b = TrajBuffer()
+
+    i = 0
+
+
+    def gen_tup():
+        global i
+        ret = ([i,i], [i,i], 1.)
+        i += 1
+        return ret
+
+    for _ in range(10):
+        b.add(*gen_tup())
+
+    while b:
+        print(*b.pop_target_tuple())
+

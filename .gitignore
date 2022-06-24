@@ -12,3 +12,5 @@ __pycache__\
 *.csv
 *.txt
 *.ini
+.run\*
+!tile_coding_re/q_table_size_heatmaps
