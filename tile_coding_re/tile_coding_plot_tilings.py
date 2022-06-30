@@ -12,7 +12,8 @@ n_act = 2
 
 env = RandomEnvDiscreteActions(n_obs, n_act)
 all_actions = get_discrete_actions(n_act)
-tilings = get_tilings_from_env(env, nb_tilings, nb_bins)
+tilings = get_tilings_from_env(env, nb_tilings, nb_bins, asymmetrical=True)
+print(tilings)
 qvf = QValueFunction(tilings, all_actions, 0.0)
 print(repr(env))
 print(f'{nb_tilings} tilings, {nb_bins} bins')

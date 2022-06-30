@@ -9,15 +9,11 @@ from tile_coding_re.tile_coding import QValueFunction2, get_tilings_from_env
 from tile_coding_re.utils import TrajSimple, TrajBuffer
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
 
-METHOD = 'mc_method'
-# METHOD = 'sarsa'
+METHOD = 'sarsa2'
 
-if METHOD == 'mc_method':
-    from tile_coding_re.mc_method.constants import par_dir
-    from tile_coding_re.mc_method.constants import *
-elif METHOD == 'sarsa':
-    from tile_coding_re.sarsa.constants import par_dir
-    from tile_coding_re.sarsa.constants import *
+if METHOD == 'sarsa2':
+    from tile_coding_re.sarsa2.constants import par_dir
+    from tile_coding_re.sarsa2.constants import *
 
 
 def get_or_ask_par_dir():
@@ -53,13 +49,21 @@ def load_env():
 
 def load_qvf_for_ep(ep):
     qvf_path = os.path.join(load_path, f'{ep}ep')
-    qvf = QValueFunction2.load(qvf_path)
-    return qvf
+    qvf1 = QValueFunction2.load(os.path.join(qvf_path, 'qvf1.npz'))
+    qvf2 = QValueFunction2.load(os.path.join(qvf_path, 'qvf2.npz'))
+    return qvf1, qvf2
 
 
-def play_episode(env, qvf, buffer=None):
-    all_actions = qvf.actions
+def greedy_policy(state, qvf1, qvf2):
+    # greedy selection of action with the largest value
+    vals1 = [qvf1.value(state, a_) for a_ in qvf1.actions]
+    vals2 = [qvf2.value(state, a_) for a_ in qvf2.actions]
+    vals = np.mean([vals1, vals2], axis=0)
 
+    return qvf1.actions[np.argmax(vals)]
+
+
+def play_episode(env, qvf1, qvf2, buffer=None):
     if buffer is None:
         buffer = TrajSimple()
     else:
@@ -68,7 +72,7 @@ def play_episode(env, qvf, buffer=None):
     o = env.reset()
     d = False
     while not d:
-        a = qvf.greedy_action(o)
+        a = greedy_policy(o, qvf1, qvf2)
         otp1, r, d, _ = env.step(a)
 
         if isinstance(buffer, TrajSimple):
@@ -89,18 +93,6 @@ def unpack_args(func):
             return(func(*args))
     return wrapper
 
-env = None
-qvf = None
-def get_an_ep_len(i):
-    o = env.reset()
-    d = False
-    i = 0
-    while not d:
-        a = qvf.greedy_action(o)
-        _, _, d, _ = env.step(a)
-        i += 1
-    return i
-
 
 def evaluation_episodes(start_ep=SAVE_EVERY, end_ep=NB_TRAINING_EPS):
     print('CREATE EVALUATION EPISODES')
@@ -118,10 +110,10 @@ def evaluation_episodes(start_ep=SAVE_EVERY, end_ep=NB_TRAINING_EPS):
     tilings = get_tilings_from_env(env, NB_TILINGS, NB_BINS)
     for ep in np.arange(start_ep, end_ep + ep_step, ep_step):
         print(f'\rEpisode #{ep}/{end_ep}', end='')
-        qvf = load_qvf_for_ep(ep)
+        qvf1, qvf2 = load_qvf_for_ep(ep)
 
         for i in range(3):
-            buffer = play_episode(env, qvf, buffer)
+            buffer = play_episode(env, qvf1, qvf2, buffer)
 
             colors = iter(plt.cm.jet(np.linspace(0, 1, NB_TILINGS)))
             line_styles = cycle(('-', '--', ':', '-.'))
@@ -143,7 +135,6 @@ def evaluation_episodes(start_ep=SAVE_EVERY, end_ep=NB_TRAINING_EPS):
 
 
 def episode_length_statistics():
-    global env, qvf
     print('CALCULATING EPISODE LENGTH STATISTICS')
     start_ep = SAVE_EVERY
     end_ep = NB_TRAINING_EPS
@@ -163,17 +154,12 @@ def episode_length_statistics():
 
     for i, ep in enumerate(ep_range):
         print(f'\rEpisode #{ep:4d}/{end_ep}', end='')
-        qvf = load_qvf_for_ep(ep)
+        qvf1, qvf2 = load_qvf_for_ep(ep)
 
-        # nproc = 4
-        # p = Pool(nproc)
-        # ep_lens[i] = p.map(get_an_ep_len, np.arange(nb_eval_eps))
         buffer = TrajSimple()
         for j in range(nb_eval_eps):
-            buffer = play_episode(env, qvf, buffer)
+            buffer = play_episode(env, qvf1, qvf2, buffer)
             ep_lens[i, j] = len(buffer)
-
-
 
     np.save(os.path.join(results_path, f'{save_name}.npy'), ep_lens)
 
@@ -215,18 +201,21 @@ def track_state_values():
     NB_TRACKED_STATES = 10
     env.seed(123)
     track_states = [env.observation_space.sample() for _ in range(NB_TRACKED_STATES)]
-    trackes_vals = np.zeros(shape=(NB_TRACKED_STATES, len(ep_range)))
+    trackes_vals1 = np.zeros(shape=(NB_TRACKED_STATES, len(ep_range)))
+    trackes_vals2 = np.zeros(shape=(NB_TRACKED_STATES, len(ep_range)))
     for i, ep in enumerate(ep_range):
         print(f'\rEpisode #{ep:4d}/{end_ep}', end='')
-        qvf = load_qvf_for_ep(ep)
+        qvf1, qvf2 = load_qvf_for_ep(ep)
         for j, ts in enumerate(track_states):
-            trackes_vals[j, i] = np.mean([qvf.value(ts, a_) for a_ in all_actions])
+            trackes_vals1[j, i] = np.mean([qvf1.value(ts, a_) for a_ in all_actions])
+            trackes_vals2[j, i] = np.mean([qvf2.value(ts, a_) for a_ in all_actions])
 
     fig, ax = plt.subplots()
     tok = par_dir.split('_')
     fig.suptitle(' '.join(tok[:4]) + '\n' + ' '.join(tok[4:])+
                  '\n' + f'Number of states tracked = {NB_TRACKED_STATES}')
-    ax.plot(ep_range, trackes_vals.T, marker='x')
+    ax.plot(ep_range, trackes_vals1.T, c='b', marker='x')
+    ax.plot(ep_range, trackes_vals2.T, c='r', ls=':', marker='x')
     ax.set_xlabel('Training episodes')
     ax.set_ylabel('Estimated value')
 
@@ -236,11 +225,12 @@ def track_state_values():
 
     fig.tight_layout()
     plt.savefig(os.path.join(results_path, f'{NB_TRACKED_STATES}random-states.png'))
+    plt.show()
     plt.close(fig)
     print('')
 
 
 if __name__ == '__main__':
-    # track_state_values()
+    track_state_values()
     # episode_length_statistics()
-    evaluation_episodes(800, 900)
+    # evaluation_episodes(400, 550)

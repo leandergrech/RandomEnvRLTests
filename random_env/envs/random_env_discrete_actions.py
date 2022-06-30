@@ -25,6 +25,7 @@ class RandomEnvDiscreteActions(RandomEnv):
         self.action_space = gym.spaces.MultiDiscrete(np.repeat(3, self.act_dimension))
         self.cum_action = None
         self.REWARD_SCALE = 1.
+        self.TRIM_FACTOR = 2.
 
     def __repr__(self):
         return f'REDA_{self.obs_dimension}obsx{self.act_dimension}act'
@@ -37,6 +38,8 @@ class RandomEnvDiscreteActions(RandomEnv):
         """
         :param action: Array of size self.act_dimension. Each action can be one of (0,1,2) - to index self.AVAIL_MOM
         """
+        for i, a in enumerate(action):
+            assert a in (0, 1, 2), f"Invalid action at index {i}: {a}"
         delta_action = (np.array(action) - 1) * self.ACTION_EPS
         self.cum_action += delta_action
         return super(RandomEnvDiscreteActions, self).step(self.cum_action)

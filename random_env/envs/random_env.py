@@ -17,9 +17,6 @@ class RandomEnv(Env):
 	GOAL = 0.1  # state threshold boundary
 	_UPDATE_SCALING = False
 
-	# Have many times smaller should the average state trim be than an state space bounds
-	TRIM_FACTOR = 5
-
 	RESET_RANDOM_WALK_STEPS = 50 # Reset func starts from optimal state, and walks randomly for these amount of steps
 	SAVED_MODEL_SUFFIX = '_dynamics.pkl'
 	K_p = 1.0
@@ -36,6 +33,8 @@ class RandomEnv(Env):
 		"""
 		super(RandomEnv, self).__init__()
 		self.REWARD_SCALE = 0.05
+		# Have many times smaller should the average state trim be than an state space bounds
+		TRIM_FACTOR = 5
 
 		self.obs_dimension, self.act_dimension = n_obs, n_act
 
@@ -181,11 +180,11 @@ class RandomEnv(Env):
 
 	def normalise_trim(self, trim):
 		trim_normed = np.divide(trim - self.trim_stats.min, self.trim_stats.ptp) * 2.0 - 1.0
-		return trim_normed / RandomEnv.TRIM_FACTOR
+		return trim_normed / self.TRIM_FACTOR
 
 	def standardise_trim(self, trim):
 		trim_stded = np.divide(trim - self.trim_stats.mean, self.trim_stats.std)
-		return trim_stded / RandomEnv.TRIM_FACTOR
+		return trim_stded / self.TRIM_FACTOR
 
 	@property
 	def model_info(self):

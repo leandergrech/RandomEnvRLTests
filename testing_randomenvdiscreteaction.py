@@ -35,10 +35,12 @@ def quick_testing_randomenvdiscreteactions():
     ax3.set_title('Dynamics Actions')
     ax3.plot(record['aa'], c='r', ls='dashed')
     fig.tight_layout()
-    plt.show()
+    # plt.show()
 
 if __name__ == '__main__':
-    quick_testing_randomenvdiscreteactions()
+    for _ in range(5):
+        quick_testing_randomenvdiscreteactions()
+    plt.show()
 
 
 
