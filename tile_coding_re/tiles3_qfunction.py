@@ -3,10 +3,10 @@ from tile_coding_re.tiles3 import tiles, IHT
 
 
 class Tilings:
-    def __init__(self, nb_tilings, nb_bins, feature_ranges, size):
-        # size = nb_tilings * nb_bins ** len(feature_ranges) * nb_ints
-        self.size = size
-        self.iht = IHT(size)
+    def __init__(self, nb_tilings, nb_bins, feature_ranges, max_tiles):
+        # max_tiles = nb_tilings * nb_bins ** len(feature_ranges) * nb_ints
+        self.max_tiles = max_tiles
+        self.iht = IHT(max_tiles)
 
         self.nb_tilings = nb_tilings
         self.nb_bins = nb_bins
@@ -46,7 +46,7 @@ class QValueFunctionTiles3:
         self.tilings = tilings
         self.actions = actions
         self.lr = lambda: next(lr) / len(tilings)
-        self.q_table = [-1.] * tilings.size
+        self.q_table = [-1.] * tilings.max_tiles
 
         self.nb_updates = 0
 

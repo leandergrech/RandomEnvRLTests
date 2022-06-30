@@ -12,7 +12,9 @@ __pycache__\
 *.csv
 *.txt
 *.ini
-.run\*
+.run*
 !tile_coding_re/q_table_size_heatmaps
 *.npy
 *.npz
+*REDA*
+*.ipynb_checkpoints*

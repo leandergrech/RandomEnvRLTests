@@ -93,6 +93,23 @@ def tiles(ihtORsize, numtilings, floats, ints=[], readonly=False):
         Tiles.append(hashcoords(coords, ihtORsize, readonly))
     return Tiles
 
+def tilesclip(ihtORsize, numtilings, floats, clipranges, ints=[], readonly=False):
+    """returns num-tilings tile indices corresponding to the floats and ints, clipping floats"""
+    cfloats = [f if f > cr[0] else cr[0] for f, cr in zip(floats, clipranges)]
+    cfloats = [f if f < cr[1] else cr[1] for f, cr in zip(cfloats, clipranges)]
+    qfloats = [floor(f * numtilings) for f in cfloats]
+    Tiles = []
+    for tiling in range(numtilings):
+        tilingX2 = tiling * 2
+        coords = [tiling]
+        b = tiling
+        for q in qfloats:
+            coords.append((q + b) // numtilings)
+            b += tilingX2
+        coords.extend(ints)
+        Tiles.append(hashcoords(coords, ihtORsize, readonly))
+    return Tiles
+
 
 def tileswrap(ihtORsize, numtilings, floats, wrapwidths, ints=[], readonly=False):
     """returns num-tilings tile indices corresponding to the floats and ints, wrapping some floats"""
