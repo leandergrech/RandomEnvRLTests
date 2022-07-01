@@ -77,9 +77,9 @@ def hashcoords(coordinates, m, readonly=False):
 from math import floor, log
 from itertools import zip_longest
 
-
+import numpy as np
 def tiles(ihtORsize, numtilings, floats, ints=[], readonly=False):
-    """returns num-tilings tile indices corresponding to the floats and ints"""
+    """returns num-tilings tile indices corresponding to the floats and ints"""    
     qfloats = [floor(f * numtilings) for f in floats]
     Tiles = []
     for tiling in range(numtilings):
@@ -87,11 +87,34 @@ def tiles(ihtORsize, numtilings, floats, ints=[], readonly=False):
         coords = [tiling]
         b = tiling
         for q in qfloats:
-            coords.append((q + b) // numtilings)
+            coord = (q + b) // numtilings
+            coords.append(coord)
             b += tilingX2
         coords.extend(ints)
         Tiles.append(hashcoords(coords, ihtORsize, readonly))
     return Tiles
+
+def tilesasymmetric(ihtORsize, numtilings, floats, displacement, ints=[], readonly=False):
+    """returns num-tilings tile indices corresponding to the floats and ints, displacement vector for asymmetric offsetting"""    
+    qfloats = [floor((f) * numtilings) for f, d in zip(floats, displacement)]
+    Tiles = []
+    
+    coords = [[0. for _ in range(1 + len(floats) + len(ints))] for _ in range(numtilings)]
+    for i, q in enumerate(qfloats):
+        for tilingactual in range(numtilings):
+            d = displacement[i]
+            tiling = d * tilingactual
+            
+            coords[tilingactual][0] = tiling
+    
+            coords[tilingactual][i+1] = (q + tiling*(1 + i*2))//numtilings
+            if len(ints)>0:
+                coords[tilingactual][-len(ints):] = ints
+    
+    for coord in coords:
+        Tiles.append(hashcoords(coord, ihtORsize, readonly))
+    return Tiles
+    
 
 def tilesclip(ihtORsize, numtilings, floats, clipranges, ints=[], readonly=False):
     """returns num-tilings tile indices corresponding to the floats and ints, clipping floats"""

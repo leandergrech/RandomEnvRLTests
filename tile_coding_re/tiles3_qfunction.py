@@ -1,5 +1,5 @@
 from collections.abc import Generator
-from tile_coding_re.tiles3 import tiles, IHT
+from tile_coding_re.tiles3 import IHT, tiles, tilesclip 
 
 
 class Tilings:
@@ -12,6 +12,9 @@ class Tilings:
         self.nb_bins = nb_bins
         self.feature_ranges = feature_ranges
         self.scale_factors = self.__get_scalings()
+        
+    def tiles(self, features, ints=[]):
+        return tiles(self.iht, self.nb_tilings, features, ints)
 
     def count(self):
         return self.iht.count()
@@ -29,7 +32,7 @@ class Tilings:
         scaled_features = []
         for f, scale in zip(features, self.scale_factors):
             scaled_features.append(f * scale)
-        return tiles(self.iht, self.nb_tilings, scaled_features, ints)
+        return self.tiles(scaled_features, ints)
 
 
 def argmax(arr):
@@ -69,8 +72,10 @@ class QValueFunctionTiles3:
         codings = self.tilings.get_tiling_indices(features=state,
                                                   ints=[action_idx])
         error = target - self.value(state, action)
+        alpha = self.lr()
         for coding in codings:
-            self.q_table[coding] += self.lr() * error
+            self.q_table[coding] += alpha * error
+        return error
 
     def greedy_action(self, state, verbose=False):
         if verbose: print(self.nb_updates)

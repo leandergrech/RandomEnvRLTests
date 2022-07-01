@@ -26,6 +26,7 @@ class RandomEnvDiscreteActions(RandomEnv):
         self.cum_action = None
         self.REWARD_SCALE = 1.
         self.TRIM_FACTOR = 2.
+        self.EPISODE_LENGTH_LIMIT = 30
 
     def __repr__(self):
         return f'REDA_{self.obs_dimension}obsx{self.act_dimension}act'

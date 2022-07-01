@@ -22,12 +22,15 @@ class TrajSimple:
         return self.data
 
     def add(self, datum):
-        if isinstance(datum, np.ndarray):
-            datum = datum.tolist()
-        if isinstance(datum, list):
-            self.data.append(datum.copy())
-        else:
-            self.data.append(datum)
+        # if isinstance(datum, np.ndarray):
+        #     datum = datum.tolist()
+        # if isinstance(datum, list):
+        #     self.data.append(datum.copy())
+        # else:
+        self.data.append(datum)
+    
+    def get_returns(self):
+        return np.flip(np.cumsum(np.flip(self.data))).tolist()
 
     def pop(self, idx):
         return self.data.pop(idx)

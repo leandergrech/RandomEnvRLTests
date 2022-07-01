@@ -8,7 +8,8 @@ from collections import deque
 from itertools import product
 
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
-from tile_coding_re.utils import TrajBuffer
+from tile_coding_re.buffers import TrajBuffer
+from tile_coding_re.training_utils import lr, play_ep_get_obs
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
 
 np.random.seed(123)
@@ -23,20 +24,17 @@ ranges = [[-1., 1.] for _ in range(n_obs)]
 actions = get_discrete_actions(n_act)
 tilings = Tilings(nb_tilings, nb_tiling_bins, ranges, 2**23)
 
-def lr_gen():
-    while True:
-        yield 1e-1
-lr = lr_gen()
+
+lr = lr(1e-1, 0)
 qvf = QValueFunctionTiles3(tilings, actions, lr)
 
-def play_ep_get_obs():
-    global qvf, env
+def play_ep_get_obs(env, policy):
     obs = []
-    o = np.random.uniform(-0.8, 0.8, 2)
-    env.reset(o)
+    # o = np.random.uniform(-0.8, 0.8, 2)
+    o = env.reset()
     d = False
     while not d:
-        a = qvf.greedy_action(o)
+        a = policy(o)
         otp1, r, d, _ = env.step(a)
 
         o = otp1
@@ -47,7 +45,7 @@ def play_ep_get_obs():
 def perform_ep_len_stats():
     ep_lens = []
     for _ in range(100):
-        ep_lens.append(len(play_ep_get_obs()[0]))
+        ep_lens.append(len(play_ep_get_obs(env, qvf.greedy_action)[0]))
     return np.mean(ep_lens), np.std(ep_lens)
 
 
@@ -195,7 +193,7 @@ for i in heatmaps_at_static:
     im = axhm.imshow(vals, extent=(-tracking_abslim, tracking_abslim, -tracking_abslim, tracking_abslim), cmap=cmap,
                      aspect='equal')
     for _ in range(2):
-        state1, state2 = play_ep_get_obs()
+        state1, state2 = play_ep_get_obs(env, qvf.greedy_action)
         lim_ep_len = 20
         state1, state2 = state1[:lim_ep_len], state2[:lim_ep_len]
         axhm.plot(state1, state2, lw=2, marker='x')

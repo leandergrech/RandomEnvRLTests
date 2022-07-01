@@ -11,7 +11,6 @@ import pickle as pkl
 
 
 class RandomEnv(Env):
-	EPISODE_LENGTH_LIMIT = 100
 	REWARD_DEQUE_SIZE = 1 #5
 	ACTION_SCALE = 1.0  # set to one during dynamic output scale adjustment test
 	GOAL = 0.1  # state threshold boundary
@@ -34,7 +33,8 @@ class RandomEnv(Env):
 		super(RandomEnv, self).__init__()
 		self.REWARD_SCALE = 0.05
 		# Have many times smaller should the average state trim be than an state space bounds
-		TRIM_FACTOR = 5
+		self.TRIM_FACTOR = 5.
+		self.EPISODE_LENGTH_LIMIT = 100
 
 		self.obs_dimension, self.act_dimension = n_obs, n_act
 
@@ -42,10 +42,10 @@ class RandomEnv(Env):
 		self.observation_space = Box(low=-1.0,
 		                             high=1.0,
 		                             shape=(self.obs_dimension,),
-		                             dtype=np.float32)
+		                             dtype=float)
 		self.action_space = Box(low=-np.ones(self.act_dimension),
 		                        high=np.ones(self.act_dimension),
-		                        dtype=np.float32)
+		                        dtype=float)
 
 		''' RL related parameters'''
 		self.current_state = None
@@ -53,7 +53,7 @@ class RandomEnv(Env):
 		self.reward_thresh = self.objective([RandomEnv.GOAL] * self.obs_dimension)
 		self.reward_deque = deque(maxlen=RandomEnv.REWARD_DEQUE_SIZE)
 		self._it = 0
-		self.max_steps = RandomEnv.EPISODE_LENGTH_LIMIT
+		self.max_steps = self.EPISODE_LENGTH_LIMIT
 
 		''' Create model dynamics and adjust scaling'''
 		if model_info is None:
@@ -120,7 +120,7 @@ class RandomEnv(Env):
 		if len(self.reward_deque) >= RandomEnv.REWARD_DEQUE_SIZE and \
 				np.max(np.abs(self.current_state)) <= RandomEnv.GOAL:
 			done, success = True, True
-		elif self._it >= RandomEnv.EPISODE_LENGTH_LIMIT - 1:
+		elif self._it >= self.EPISODE_LENGTH_LIMIT - 1:
 			done = True
 		return done, success
 
