@@ -8,7 +8,7 @@ def make_heatmap(ax, z, x, y, title=None):
     xmin, xmax = get_min_and_max(x)
     ymin, ymax = get_min_and_max(y)
     
-    im = ax.imshow(z, extent=(xmin, xmax, ymin, ymax))
+    im = ax.imshow(z, extent=(xmin, xmax, ymin, ymax), aspect='auto')
     ax.axvline(0.0, c='w')
     ax.axhline(0.0, c='w')
     plt.colorbar(im, ax=ax, orientation='horizontal')
