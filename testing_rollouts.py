@@ -13,11 +13,13 @@ act_dim = env.act_dimension
 batch_size = 100
 ep_max_size = 10
 
+
 def get_action(o):
 	dist = MultivariateNormal(t.zeros(act_dim), t.diag(t.ones(act_dim)))
 	action = dist.sample()
 	log_prob = dist.log_prob(action)
 	return action, log_prob.item()
+
 
 def compute_rtgs(r, lens=None):
 	if isinstance(r, list): r = t.tensor(r)
@@ -26,6 +28,7 @@ def compute_rtgs(r, lens=None):
 	rev_disc_rew = temp.flip(-1)
 	returns = t.cumsum(rev_disc_rew, dim=-1).flip(-1) / pows
 	return returns
+
 
 def rollout1(*args):
 	t.random.manual_seed(123)
@@ -66,6 +69,7 @@ def rollout1(*args):
 	batch_lens = t.tensor(batch_lens)
 	return batch_obs, batch_acts, batch_rews, batch_log_probs, batch_rtgs, batch_lens
 
+
 def rollout2(*args):
 	t.random.manual_seed(123)
 	np.random.seed(123)
@@ -87,15 +91,15 @@ def rollout2(*args):
 		for k in range(K):
 			a, log_prob = get_action(o)
 			obs_idx = b * obs_dim
-			batch_obs[obs_idx:obs_idx+obs_dim] = t.tensor(o)
+			batch_obs[obs_idx:obs_idx + obs_dim] = t.tensor(o)
 			o, r, d, _ = env.step(a)
 			act_idx = b * obs_dim
-			batch_acts[act_idx:act_idx+act_dim] = a
+			batch_acts[act_idx:act_idx + act_dim] = a
 			batch_log_probs[b] = log_prob
 			batch_rews[b] = r
 			if k == stop_idx: break
 			if d: break
-		batch_rtgs[b:b+k] = compute_rtgs(batch_rews[-k:])
+		batch_rtgs[b:b + k] = compute_rtgs(batch_rews[-k:])
 		batch_lens[b] = k + 1
 		b += k
 
@@ -107,10 +111,11 @@ def rollout2(*args):
 
 	return batch_obs, batch_acts, batch_rews, batch_log_probs, batch_rtgs, batch_lens
 
+
 t2, batch2 = timeit(rollout2, (None,), 1)
 t1, batch1 = timeit(rollout1, (None,), 1)
 
-print(f'{(t1/t2)*100.0}% improvement')
+print(f'{(t1 / t2) * 100.0}% improvement')
 print(f'B={batch_size}, K={ep_max_size}')
 print(f't_old={t1}\nt_new={t2}')
 print(batch1[2].reshape(-1, obs_dim), batch1[4].reshape(-1, obs_dim))

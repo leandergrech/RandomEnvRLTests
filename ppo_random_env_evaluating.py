@@ -15,6 +15,8 @@ N_STEPS = 300
 DPI = 50
 ANIMATION_INTERVAL = 50
 NB_EVALUATION_GIFS = 3
+
+
 # Evaluate with a scaled initial state to test `easier` initial conditions closer to the optimal state
 # INIT_STATE_SCALE = 1.0
 
@@ -123,7 +125,6 @@ def save_agent_vs_optimal_gif(model, env, opt_env, save_path, title_name, init_s
 
 	d_agent, d_opt = [False] * 2
 
-
 	def animate(i):
 		nonlocal o_bars, a_bars, o_bars_opt, a_bars_opt
 		nonlocal ax_state, ax_state_opt
@@ -165,7 +166,7 @@ def save_agent_vs_optimal_gif(model, env, opt_env, save_path, title_name, init_s
 		rew_line_opt.set_data(range(len(rewards_opt)), rewards_opt)
 		ax_rewards.set_xlim((-2, max(len(rewards), len(rewards_opt)) + 2))
 		max_reward = max(np.concatenate([rewards, rewards_opt, [rew_ylim[1]]]))
-		ax_rewards.set_ylim((rew_ylim[0], 1.1*max_reward))
+		ax_rewards.set_ylim((rew_ylim[0], 1.1 * max_reward))
 		rew_ylim = ax_rewards.get_ylim()
 
 		# Update state and action plots
@@ -177,11 +178,11 @@ def save_agent_vs_optimal_gif(model, env, opt_env, save_path, title_name, init_s
 		ax_action.set_ylim(get_action_ylims(a))
 		ax_action_opt.set_ylim(get_action_ylims(a))
 
-		# return o_bars, a_bars, o_bars_opt, a_bars_opt, fig.axes
+	# return o_bars, a_bars, o_bars_opt, a_bars_opt, fig.axes
 
 	print('Starting animation')
 	anim = FuncAnimation(fig=fig, func=animate, frames=N_STEPS,
-	                               interval=ANIMATION_INTERVAL, blit=False, repeat=False)
+						 interval=ANIMATION_INTERVAL, blit=False, repeat=False)
 
 	# plt.show()
 	print(f'Saving animation to: {save_path}')
@@ -220,7 +221,6 @@ def gif_of_one_agent_at_specific_training_step(training_session_date, training_s
 	else:
 		model_name = f'PPO_RandomEnv_{n_obs}obsx{n_act}act_seed{training_seed}'
 
-
 	# Load environment dyanamics used to train the agent and the trained agent at the requested training step
 	env, opt_env, agent = setup_experiment(load_dir, model_name, training_step)
 
@@ -234,9 +234,9 @@ def gif_of_one_agent_at_specific_training_step(training_session_date, training_s
 	with warnings.catch_warnings():
 		warnings.simplefilter("ignore")
 		save_agent_vs_optimal_gif(agent, env, opt_env,
-		                          save_path,
-		                          model_name + f' @ {training_step} training steps',
-		                          init_state=init_state)
+								  save_path,
+								  model_name + f' @ {training_step} training steps',
+								  init_state=init_state)
 
 
 def gifs_of_agent_performance_during_training_same_init_state():
@@ -273,21 +273,18 @@ def gifs_of_agent_performance_during_training_same_init_state():
 		available_steps = sorted(available_steps)
 		for INIT_STATE_SCALE in (1.0, 0.5, 0.2):
 
-			init_states = np.random.uniform(-1 , 1, size=NB_EVALUATION_GIFS*n_obs).reshape((NB_EVALUATION_GIFS, n_obs)) \
-			              * INIT_STATE_SCALE
+			init_states = np.random.uniform(-1, 1, size=NB_EVALUATION_GIFS * n_obs).reshape((NB_EVALUATION_GIFS, n_obs)) \
+						  * INIT_STATE_SCALE
 
 			for EVAL_STEP in available_steps:
 				if EVAL_STEP in required_steps:
 					for i in range(NB_EVALUATION_GIFS):
-						print(f'-> {model_name} - INIT_STATE_SCALE={INIT_STATE_SCALE} - GIF #{i+1}')
+						print(f'-> {model_name} - INIT_STATE_SCALE={INIT_STATE_SCALE} - GIF #{i + 1}')
 						gif_of_one_agent_at_specific_training_step(training_session_date=training_session_date,
-						                                           training_seed=EVALUATE_SEED,
-						                                           training_step=EVAL_STEP,
-						                                           init_state=np.copy(init_states[i]))
-
+																   training_seed=EVALUATE_SEED,
+																   training_step=EVAL_STEP,
+																   init_state=np.copy(init_states[i]))
 
 
 if __name__ == '__main__':
-    gifs_of_agent_performance_during_training_same_init_state()
-
-
+	gifs_of_agent_performance_during_training_same_init_state()

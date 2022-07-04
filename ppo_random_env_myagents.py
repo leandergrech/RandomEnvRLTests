@@ -14,21 +14,21 @@ COMET_WORKSPACE = 'testing-ppo-trpo'
 COMMON_ENV_DIR = 'common_envs'
 DEFAULT_PPO_PARAMS = dict(
 	# Network structures
-	actor_hidden_layers = [200, 200],
-	critic_hidden_layers = [200, 100],
+	actor_hidden_layers=[200, 200],
+	critic_hidden_layers=[200, 100],
 	# Data collection
-	timesteps_per_batch = 2000,
-	max_timesteps_per_episode = RandomEnv.EPISODE_LENGTH_LIMIT,
-	#Return
-	gamma = 0.99,
+	timesteps_per_batch=2000,
+	max_timesteps_per_episode=RandomEnv.EPISODE_LENGTH_LIMIT,
+	# Return
+	gamma=0.99,
 	# Optimization
-	actor_optim_type = t.optim.SGD,
-	critic_optim_type = t.optim.Adam,
-	n_updates_per_iteration = 10,
-	clip = 0.2,
-	lr_actor = 1e-2,
-	lr_halflife_actor = int(1e5),
-	lr_critic = 1e-3)
+	actor_optim_type=t.optim.SGD,
+	critic_optim_type=t.optim.Adam,
+	n_updates_per_iteration=10,
+	clip=0.2,
+	lr_actor=1e-2,
+	lr_halflife_actor=int(1e5),
+	lr_critic=1e-3)
 
 # '''
 # HYPERPARAMETER GRID SEARCH PPO ON 5X5
@@ -99,5 +99,3 @@ for RANDOM_SEED in (123, 234, 345, 456, 567):
 	writer = get_writer(model_name, session_name, COMET_WORKSPACE)
 	'''Start training'''
 	model.learn(total_timesteps=NB_STEPS, callback=eval_callback, writer=writer)
-
-

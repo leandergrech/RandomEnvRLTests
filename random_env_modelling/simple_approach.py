@@ -12,6 +12,7 @@ from constants import NB_TRAJS, DATA_DIR_NAME
 
 COMET_WORKSPACE = "re_modelling"
 
+
 def get_re_trajectories(n_obs, n_act):
 	env = RandomEnv(n_obs=n_obs, n_act=n_act, estimate_scaling=False)
 	env_dir = os.path.join(DATA_DIR_NAME, f'{n_obs}x{n_act}')
@@ -20,6 +21,7 @@ def get_re_trajectories(n_obs, n_act):
 	data = np.load(os.path.join(env_dir, f'{NB_TRAJS}_{repr(env)}_trajectories.npz'))
 
 	return env, data['obses'], data['acts'], data['rews'], data['obsestp1'], data['rets']
+
 
 def test_models(vm, tm, env):
 	# opt_env = RandomEnv(n_obs=env.obs_dimension, n_act=env.act_dimension, model_info=env.model_info)
@@ -76,7 +78,6 @@ for n_obs in np.arange(2, 11, 2):
 		transition_in_test = transition_in[test_idxs]
 		transition_out_test = transition_out[test_idxs]
 
-
 		print(f'SESSION {session_name} - EXP {experiment_name} - WS {COMET_WORKSPACE}')
 		losses_v_train = deque(maxlen=OPT_STEPS)
 		losses_t_train = deque(maxlen=OPT_STEPS)
@@ -111,9 +112,9 @@ for n_obs in np.arange(2, 11, 2):
 				loss_t_test = loss_fn(pred_obstp1, transition_out_test)
 
 				writer.log_metrics(dict(value_loss_test=loss_v_test, transition_loss_test=loss_t_test),
-				                   step=i)
+								   step=i)
 
-				print(f'-> Iteration {i}/{OPT_STEPS}  {i/OPT_STEPS * 100}%')
+				print(f'-> Iteration {i}/{OPT_STEPS}  {i / OPT_STEPS * 100}%')
 				print(f' `-> Value Train loss: {loss_v_train}')
 				print(f' `-> Value Test loss: {loss_v_test}')
 				print(f' `-> Transition Train loss: {loss_t_train}')
@@ -122,10 +123,3 @@ for n_obs in np.arange(2, 11, 2):
 				if loss_v_test > loss_v_train and loss_t_test > loss_v_train:
 					print('end - Finished training')
 					break
-
-
-
-
-
-
-

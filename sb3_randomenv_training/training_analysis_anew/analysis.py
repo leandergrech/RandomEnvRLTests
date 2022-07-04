@@ -12,10 +12,13 @@ COMET_PROJECT_NAME = 'sess-trpo-050622-004429'
 
 api = API(api_key=COMET_API_KEY)
 experiments = api.get(COMET_WORKSPACE_NAME, COMET_PROJECT_NAME)
+
+
 def get_experiment_by_name(name):
 	for e in experiments:
 		if name in e.get_name():
 			return e
+
 
 def get_metric_list(experiment, metric_name):
 	raw_data = experiment.get_metrics(metric_name)
@@ -25,6 +28,7 @@ def get_metric_list(experiment, metric_name):
 		data.append(item['metricValue'])
 		steps.append(item['step'])
 	return data, steps
+
 
 csv_dir = 'csv'
 data = defaultdict(list)
@@ -54,13 +58,16 @@ markers = ('x', '1', '2', '3', '4')
 for i, (env_sz, datum) in enumerate(data.items()):
 	for nb_training_steps, c, env_seed, m in zip(datum, colors, env_seeds, markers):
 		x = np.repeat(env_sz, len(nb_training_steps))
-		if i == 0: label=f'env_seed={env_seed}'
-		else: label=None
+		if i == 0:
+			label = f'env_seed={env_seed}'
+		else:
+			label = None
 		ax.scatter(x, nb_training_steps, marker=m, s=60, color=c, label=label, zorder=15)
 		nb_training_steps_mean_list[env_sz].append(np.mean(nb_training_steps))
 
 sizes = np.arange(min(nb_training_steps_mean_list), max(nb_training_steps_mean_list) + 1)
-means = [[nb_training_steps_mean_list[item][i] for item in sizes] for i in range(len(nb_training_steps_mean_list[sizes[0]]))]
+means = [[nb_training_steps_mean_list[item][i] for item in sizes] for i in
+		 range(len(nb_training_steps_mean_list[sizes[0]]))]
 for m, c, env_seed in zip(means, colors, env_seeds):
 	ax.plot(sizes, m, color=c, zorder=10, alpha=0.5)
 
@@ -73,8 +80,3 @@ fig.suptitle('RandomEnv')
 fig.tight_layout()
 fig.savefig('results_with_mean.png')
 plt.show()
-
-
-
-
-

@@ -4,6 +4,7 @@ arr = t.rand(2000).reshape(20, 100)
 
 gamma = 0.99
 
+
 def compute1(batch_rews):
 	global gamma
 
@@ -32,7 +33,10 @@ def compute2(batch_rews):
 
 	return q_vals
 
+
 from datetime import datetime as dt
+
+
 def timeit(func, inputs, number=1000):
 	start = dt.now()
 	for _ in range(number):
@@ -40,6 +44,7 @@ def timeit(func, inputs, number=1000):
 	end = dt.now()
 
 	return end - start
+
 
 c1_time = timeit(compute1, (arr,))
 print('compute1 time: ', c1_time)
@@ -51,6 +56,6 @@ print('compute2 time: ', c2_time)
 c2 = compute2(arr)
 print(c2)
 
-print(f'\n{(c2_time/c1_time - 1)*100.0:.2f}% speedup')
+print(f'\n{(c2_time / c1_time - 1) * 100.0:.2f}% speedup')
 c_mean, c_std = t.mean(c1 - c2), t.std(c1 - c2)
 print(c_mean, c_std)

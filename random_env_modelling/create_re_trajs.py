@@ -8,7 +8,6 @@ from constants import DISCOUNT, NB_TRAJS, DATA_DIR_NAME
 
 make_path_exist(DATA_DIR_NAME)
 
-
 for n_act in range(2, 11, 2):
 	for n_obs in range(2, 11, 2):
 		obses = np.zeros(shape=(NB_TRAJS, n_obs))
@@ -45,7 +44,4 @@ for n_act in range(2, 11, 2):
 				k = 0
 
 		np.savez(os.path.join(path, f'{NB_TRAJS}_{repr(env)}_trajecotries'), obses=obses, obsestp1=obsestp1,
-		         acts=acts, rews=rews, rets=rets)
-
-
-
+				 acts=acts, rews=rews, rets=rets)

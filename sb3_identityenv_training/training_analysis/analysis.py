@@ -12,10 +12,13 @@ COMET_PROJECT_NAME = 'sess-trpo-050522-131337'
 
 api = API(api_key=COMET_API_KEY)
 experiments = api.get(COMET_WORKSPACE_NAME, COMET_PROJECT_NAME)
+
+
 def get_experiment_by_name(name):
 	for e in experiments:
 		if name in e.get_name():
 			return e
+
 
 def get_metric_list(experiment, metric_name):
 	raw_data = experiment.get_metrics(metric_name)
@@ -62,8 +65,3 @@ fig.suptitle('IdentityEnv')
 fig.tight_layout()
 fig.savefig('results.png')
 plt.show()
-
-
-
-
-

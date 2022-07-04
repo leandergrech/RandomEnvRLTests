@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 from random_env.envs import RandomEnv
 
+
 def quick_testing_randomenv():
 	n_obs = 10
 	n_act = 10
@@ -40,7 +41,7 @@ def quick_testing_randomenv():
 		lobs.set_ydata(o2)
 		lact.set_ydata(a)
 		fig.suptitle(f'Step {cur_step}, Done = {d}\n' +
-		             f'std(o1 - o2))) = {np.std(o1 - o2):.4f}\treward = {r:.4f}')
+					 f'std(o1 - o2))) = {np.std(o1 - o2):.4f}\treward = {r:.4f}')
 		plt.pause(0.1)
 
 		o_list.append(o2.copy())
@@ -65,5 +66,5 @@ def quick_testing_randomenv():
 
 
 if __name__ == '__main__':
-    # quick_testing_randomenv()
+	# quick_testing_randomenv()
 	env = RandomEnv.load_from_dir('common_envs')

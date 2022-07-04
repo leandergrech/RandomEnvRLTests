@@ -6,4 +6,3 @@ for env_sz in np.arange(5, 15):
 	env.rm = np.diag(np.ones(env_sz))
 	env.pi = np.diag(np.ones(env_sz))
 	env.save_dynamics('.')
-

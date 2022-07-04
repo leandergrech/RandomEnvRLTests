@@ -12,8 +12,8 @@ from torch.optim import Adam, SGD
 from torch.distributions import MultivariateNormal
 from torch.autograd import grad
 
-
 from collections import namedtuple
+
 Rollout = namedtuple('Rollout', ['states', 'actions', 'rewards', 'next_states', ])
 
 COMET_WORKSPACE = 'testing_ppo_trpo'
@@ -48,7 +48,7 @@ class OnPolicy(ABC):
 		pass
 
 	@abstractmethod
-	def predict(self,o, deterministic=True):
+	def predict(self, o, deterministic=True):
 		pass
 
 	def rollout(self, *args, **kwargs):
@@ -119,6 +119,7 @@ class OnPolicy(ABC):
 		batch_rtgs = t.cumsum(discounted_rews.flip(-1), dim=-1).flip(-1) / pows
 		return batch_rtgs
 
+
 class PPO(OnPolicy):
 	def __init__(self, env, **kwargs):
 		self.__name = None
@@ -129,7 +130,7 @@ class PPO(OnPolicy):
 		self.critic = utils.MLP(self.obs_dim, 1, self.critic_hidden_layers)
 
 		# Create actor covariance matrix
-		self.cov_var = t.full(size=(self.act_dim,), fill_value=0.5) # 0.5 arbitrary
+		self.cov_var = t.full(size=(self.act_dim,), fill_value=0.5)  # 0.5 arbitrary
 		self.cov_mat = t.diag(self.cov_var)
 
 		# Initialize optimizers
@@ -169,23 +170,23 @@ class PPO(OnPolicy):
 
 	def get_hparams(self):
 		return dict(
-			actor_hidden_layers = self.actor_hidden_layers,
-			critic_hidden_layers = self.critic_hidden_layers,
-			timesteps_per_batch = self.timesteps_per_batch,
-			max_timesteps_per_episode = self.max_timesteps_per_episode,
-			gamma = self.gamma,
-			actor_optim_type = self.actor_optim_type,
-			critic_optim_type = self.critic_optim_type,
-			n_updates_per_iteration = self.n_updates_per_iteration,
-			clip = self.clip,
-			lr_actor = self.lr_actor,
-			lr_init_actor = self.lr_init_actor,
-			lr_halflife_actor = self.lr_halflife_actor,
-			lr_critic = self.lr_critic
+			actor_hidden_layers=self.actor_hidden_layers,
+			critic_hidden_layers=self.critic_hidden_layers,
+			timesteps_per_batch=self.timesteps_per_batch,
+			max_timesteps_per_episode=self.max_timesteps_per_episode,
+			gamma=self.gamma,
+			actor_optim_type=self.actor_optim_type,
+			critic_optim_type=self.critic_optim_type,
+			n_updates_per_iteration=self.n_updates_per_iteration,
+			clip=self.clip,
+			lr_actor=self.lr_actor,
+			lr_init_actor=self.lr_init_actor,
+			lr_halflife_actor=self.lr_halflife_actor,
+			lr_critic=self.lr_critic
 		)
 
 	def learn(self, total_timesteps, callback, writer):
-		total_timesteps = int(total_timesteps) # just in case
+		total_timesteps = int(total_timesteps)  # just in case
 
 		# Initialize tensorboard writer
 		self.writer = writer
@@ -201,7 +202,7 @@ class PPO(OnPolicy):
 		t_so_far = 0
 		while t_so_far < total_timesteps:
 			batch = self.rollout(self.timesteps_per_batch, self.max_timesteps_per_episode)
-			if batch is None: # end training
+			if batch is None:  # end training
 				return
 			batch_obs, batch_acts, _, batch_log_probs, batch_rtgs, batch_lens = batch
 
@@ -211,7 +212,7 @@ class PPO(OnPolicy):
 			# V_{phi, k} and advantage
 			V = self.get_values(batch_obs).detach()
 			A_k = batch_rtgs - V
-			A_k = (A_k - A_k.mean()) / (A_k.std() + 1e-10) # standardization
+			A_k = (A_k - A_k.mean()) / (A_k.std() + 1e-10)  # standardization
 
 			# Optimization loop
 			for _ in range(self.n_updates_per_iteration):
@@ -233,9 +234,8 @@ class PPO(OnPolicy):
 
 				# Calculate gradients and perform backprop for actor
 				self.actor_optim.zero_grad()
-				actor_loss.backward(retain_graph=True) # so we can call backprop twice
+				actor_loss.backward(retain_graph=True)  # so we can call backprop twice
 				self.actor_optim.step()
-
 
 				# Calculate gradients and perform backprop for critic
 				self.critic_optim.zero_grad()
@@ -245,7 +245,6 @@ class PPO(OnPolicy):
 				# Collect data for logging
 				actor_losses.append(actor_loss.item())
 				critic_losses.append(critic_loss.item())
-
 
 			actor_loss = np.mean(actor_losses)
 			critic_loss = np.mean(critic_losses)
@@ -260,7 +259,7 @@ class PPO(OnPolicy):
 	def get_action(self, o):
 		return self.actor(o)
 
-	def predict(self,o, deterministic=True):
+	def predict(self, o, deterministic=True):
 		action_mean = self.get_action(o)
 		if deterministic:
 			return action_mean.detach().numpy()
@@ -279,11 +278,12 @@ class PPO(OnPolicy):
 
 	def update_learning_rate(self):
 		# Update exponential decay of actor lr
-		self.lr_actor = self.lr_init_actor * np.exp(-(1/self.lr_halflife_actor) * self.num_timesteps)
+		self.lr_actor = self.lr_init_actor * np.exp(-(1 / self.lr_halflife_actor) * self.num_timesteps)
 
 		for optim, lr in zip((self.actor_optim, self.critic_optim), (self.lr_actor, self.lr_critic)):
 			for g in self.actor_optim.param_groups:
 				g['lr'] = lr
+
 
 class TRPO(OnPolicy):
 	def __init__(self, env, **kwargs):
@@ -318,20 +318,25 @@ class TRPO(OnPolicy):
 		self.value_optim_type = kw.get('value_optim_type', Adam)
 		self.value_lr = kw.get('value_lr', 1e-3)
 
-		self.max_kl_div = kw.get('max_kl_div', 0.01)		# max kl before and after each step
-		self.max_value_step = kw.get('max_value_step', 0.01)		# lr for value function
-		self.vf_iters = kw.get('vf_iters', 1)		# nb of times to optimize value func over each set of training experiences
-		self.vf_l2_reg_coef = kw.get('vf_l2_reg_coef', 1e-3)		# regularization term when calc. L2 loss of value function
-		self.discount = kw.get('discount', 0.995)		# discount for future rewards
-		self.lam = kw.get('lam', 0.98)		# bias reduction parameter when calculing advantages using GAE
+		self.max_kl_div = kw.get('max_kl_div', 0.01)  # max kl before and after each step
+		self.max_value_step = kw.get('max_value_step', 0.01)  # lr for value function
+		self.vf_iters = kw.get('vf_iters',
+							   1)  # nb of times to optimize value func over each set of training experiences
+		self.vf_l2_reg_coef = kw.get('vf_l2_reg_coef', 1e-3)  # regularization term when calc. L2 loss of value function
+		self.discount = kw.get('discount', 0.995)  # discount for future rewards
+		self.lam = kw.get('lam', 0.98)  # bias reduction parameter when calculing advantages using GAE
 
-		self.cg_damping = kw.get('cg_damping', 1e-3,)		# identity matrix multiple to add to Hessian when calc. Hessian-vector prod
-		self.cg_max_iters = kw.get('cg_max_iters', 10)		# max nb of iterations when solving for optimal search direction
+		self.cg_damping = kw.get('cg_damping',
+								 1e-3, )  # identity matrix multiple to add to Hessian when calc. Hessian-vector prod
+		self.cg_max_iters = kw.get('cg_max_iters', 10)  # max nb of iterations when solving for optimal search direction
 
-		self.line_search_coef = kw.get('line_search_coef', 0.9)		# proportion by which to reduce step length on each line search iteration
-		self.line_search_max_iter = kw.get('line_search_max_iter', 10)		# max nb of line search iterations before returning 0.0 as step length
-		self.line_search_accept_ratio = kw.get('line_search_accept_ratio', 0.1)		# min proportion of error to accept from line search linear extrapolation
-		self.model_name = kw.get('model_name', None)		# filepaths identifier
+		self.line_search_coef = kw.get('line_search_coef',
+									   0.9)  # proportion by which to reduce step length on each line search iteration
+		self.line_search_max_iter = kw.get('line_search_max_iter',
+										   10)  # max nb of line search iterations before returning 0.0 as step length
+		self.line_search_accept_ratio = kw.get('line_search_accept_ratio',
+											   0.1)  # min proportion of error to accept from line search linear extrapolation
+		self.model_name = kw.get('model_name', None)  # filepaths identifier
 
 	def learn(self, total_timesteps, callback, log_dir=None):
 		total_timesteps = int(total_timesteps)  # just in case
@@ -357,16 +362,16 @@ class TRPO(OnPolicy):
 
 			# Get advantages from current value function and actual returns
 			advantages = self.get_advantages(batch_obs, batch_rews)
-			# Update policy
+		# Update policy
 
-			# Update value function
+		# Update value function
 
 	def get_advantages(self, states, rewards):
 		values = self.value_fun(states)
 		values_next = t.cat([values[:, 1:], t.zeros(values.shape[0]).unsqueeze(1)])
 		td_residuals = rewards + self.discount * values_next - values
 		discount_powers = t.pow(self.discount * self.lam,
-							 t.arange(0, rewards.size(0)).float())
+								t.arange(0, rewards.size(0)).float())
 		discounted_residuals = td_residuals * discount_powers
 		advantages = t.cumsum(discounted_residuals.flip(-1), dim=-1).flip(-1) / discount_powers
 		return advantages
@@ -380,7 +385,7 @@ class TRPO(OnPolicy):
 
 		return a.detach().numpy(), log_prob.detach()
 
-	def predict(self,o, deterministic=True):
+	def predict(self, o, deterministic=True):
 		pass
 
 	@staticmethod
@@ -439,14 +444,17 @@ class TRPO(OnPolicy):
 		:return:
 		"""
 		flatten = lambda outs, ins: t.cat([v.view(-1) for v in grad_f])
-		inputs=  list(inputs)
+		inputs = list(inputs)
 		grad_f = flatten(grad(functional_output, inputs, retain_graph=True, create_graph=True))
+
 		def Hvp_fun(v, retain_graph=True):
 			gvp = t.matmul(grad_f, v)
 			Hvp = flatten(grad(gvp, inputs, retain_graph=True))
 			Hvp += damping_coef * v
 			return Hvp
+
 		return Hvp_fun
+
 
 def train_my_ppo():
 	nb_training_steps = 5e5
@@ -468,6 +476,7 @@ def train_my_ppo():
 	callback = utils.EvalCheckpointEarlyStopTrainingCallback(eval_env, save_dir, EVAL_FREQ=500, CHKPT_FREQ=1000)
 	agent = PPO(env)
 	agent.learn(nb_training_steps, callback, log_dir)
+
 
 if __name__ == '__main__':
 	train_my_ppo()

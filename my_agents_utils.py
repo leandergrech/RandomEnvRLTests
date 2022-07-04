@@ -1,4 +1,5 @@
 from comet_ml import Experiment
+
 # comet_ml.init(project_name='tensorboardX')
 # from tensorboardX import SummaryWriter
 COMET_API_KEY = "LvCyhW3NX1yaPPqv3LIMb1qDr"
@@ -14,6 +15,7 @@ import torch as t
 from torch import nn
 import torch.nn.functional as F
 
+
 def timeit(func, inputs, number=100):
 	start = dt.now()
 	f = partial(func, *inputs)
@@ -23,7 +25,9 @@ def timeit(func, inputs, number=100):
 
 	return end - start, out
 
+
 def count_parameters(model): return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 
 class MLP(nn.Module):
 	def __init__(self, in_dim, out_dim, hidden_layers, act_fun=None, dtype=None):
@@ -60,6 +64,7 @@ class MLP(nn.Module):
 
 		return self.layers[-1](x)
 
+
 # from stable_baselines3.common.callbacks import BaseCallback
 class EvalCheckpointEarlyStopTrainingCallback():
 	MAX_EPS = 20  # Number of evaluation episodes to run the latest policy
@@ -93,7 +98,8 @@ class EvalCheckpointEarlyStopTrainingCallback():
 
 		self.gamma = 0.99
 		self.discounts = [np.power(self.gamma, i) for i in range(self.env.EPISODE_LENGTH_LIMIT)]
-		self.successes = deque(maxlen=EvalCheckpointEarlyStopTrainingCallback.END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES)
+		self.successes = deque(
+			maxlen=EvalCheckpointEarlyStopTrainingCallback.END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES)
 		super(EvalCheckpointEarlyStopTrainingCallback, self).__init__()
 
 		self.steps_since_last_animation = 0
@@ -207,8 +213,8 @@ class EvalCheckpointEarlyStopTrainingCallback():
 				print(f'\t-> FPS = {fps:.2f}')
 				print('')
 
-			self.writer.log_metrics({'eval/episode_return':returns,
-									 'eval/episode_length':ep_lens,
+			self.writer.log_metrics({'eval/episode_return': returns,
+									 'eval/episode_length': ep_lens,
 									 'eval/success': success,
 									 'eval/rew_final_neg_init': rew_final_neg_init,
 									 'eval/expected_rew_per_step': expected_rew_per_step,
@@ -254,7 +260,7 @@ class EvalCheckpointEarlyStopTrainingCallback():
 
 		d = False
 		new_ylim = lambda ax, ydat: (np.min(np.concatenate([ax.get_ylim(), ydat])),
-		                             np.max(np.concatenate([ax.get_ylim(), ydat])))
+									 np.max(np.concatenate([ax.get_ylim(), ydat])))
 		while not d:
 			a = self.model.predict(o1, deterministic=True)[0]
 			o2, r, d, _ = self.env.step(a)
@@ -269,6 +275,7 @@ class EvalCheckpointEarlyStopTrainingCallback():
 		plt.pause(2)
 		plt.close()
 
+
 class ExperimentWrapper(Experiment):
 	def __init__(self, *args, **kwargs):
 		super(ExperimentWrapper, self).__init__(*args, **kwargs)
@@ -276,19 +283,22 @@ class ExperimentWrapper(Experiment):
 	def record(self, tag, val, step=None, **kwargs):
 		if 'exclude' in kwargs:
 			return None
-		return self.log_parameters({tag:val}, step=step)
+		return self.log_parameters({tag: val}, step=step)
 
 	def dump(self, *args, **kwargs):
 		pass
+
 
 def get_writer(experiment_name, project_name, workspace):
 	exp = ExperimentWrapper(api_key=COMET_API_KEY, project_name=project_name, workspace=workspace)
 	exp.add_tag(experiment_name)
 	return exp
 
+
 def make_path_exist(dir):
 	if not os.path.exists(dir):
 		os.makedirs(dir)
+
 
 def compute_returns(r_traj, DISCOUNT=0.99):
 	r_traj = t.tensor(r_traj, dtype=t.double)

@@ -1,7 +1,7 @@
 import os.path
 import warnings
 from collections import deque
-import re # regular expressions: string formatting, etc.
+import re  # regular expressions: string formatting, etc.
 import matplotlib.pyplot as plt
 import numpy as np
 from gym import Env
@@ -11,12 +11,12 @@ import pickle as pkl
 
 
 class RandomEnv(Env):
-	REWARD_DEQUE_SIZE = 1 #5
+	REWARD_DEQUE_SIZE = 1  # 5
 	ACTION_SCALE = 1.0  # set to one during dynamic output scale adjustment test
 	GOAL = 0.1  # state threshold boundary
 	_UPDATE_SCALING = False
 
-	RESET_RANDOM_WALK_STEPS = 50 # Reset func starts from optimal state, and walks randomly for these amount of steps
+	RESET_RANDOM_WALK_STEPS = 50  # Reset func starts from optimal state, and walks randomly for these amount of steps
 	SAVED_MODEL_SUFFIX = '_dynamics.pkl'
 	K_p = 1.0
 	K_i = 0.0
@@ -40,12 +40,12 @@ class RandomEnv(Env):
 
 		''' State and action space'''
 		self.observation_space = Box(low=-1.0,
-		                             high=1.0,
-		                             shape=(self.obs_dimension,),
-		                             dtype=float)
+									 high=1.0,
+									 shape=(self.obs_dimension,),
+									 dtype=float)
 		self.action_space = Box(low=-np.ones(self.act_dimension),
-		                        high=np.ones(self.act_dimension),
-		                        dtype=float)
+								high=np.ones(self.act_dimension),
+								dtype=float)
 
 		''' RL related parameters'''
 		self.current_state = None
@@ -127,7 +127,7 @@ class RandomEnv(Env):
 	def get_optimal_action(self, state, state_clip=None):
 		if state_clip:
 			state = np.clip(state, -state_clip, state_clip)
-		self.prev_error = np.copy(state)   # in case integral controller is used as well
+		self.prev_error = np.copy(state)  # in case integral controller is used as well
 
 		action = -self.pi.dot(RandomEnv.K_p * state + RandomEnv.K_i * self.prev_error)
 		return action / max([1.0, max(abs(action))])  # linearly scaled response to fit within [-1, 1]
@@ -206,7 +206,8 @@ class RandomEnv(Env):
 				if self.verbose:
 					print(f'Saved model dynamics of {self.__repr__()} to: {save_path}')
 		else:
-			raise FileExistsError(f'Directory passed: {save_dir}, already contains dynamics for a {self.__repr__()} environment.')
+			raise FileExistsError(
+				f'Directory passed: {save_dir}, already contains dynamics for a {self.__repr__()} environment.')
 
 	def load_dynamics(self, load_dir):
 		load_path = os.path.join(load_dir, self.__repr__() + RandomEnv.SAVED_MODEL_SUFFIX)
@@ -217,7 +218,8 @@ class RandomEnv(Env):
 				self.pi = dynamics['pi']
 				self.trim_stats = dynamics['trim_stats']
 		else:
-			raise FileNotFoundError(f'Directory passed: {load_dir}, does not contain dynamics for a {self.__repr__()} envirnment.')
+			raise FileNotFoundError(
+				f'Directory passed: {load_dir}, does not contain dynamics for a {self.__repr__()} envirnment.')
 
 	@staticmethod
 	def load_from_dir(load_dir):
@@ -295,7 +297,7 @@ def quick_testing_randomenv():
 		lobs.set_ydata(o2)
 		lact.set_ydata(a)
 		fig.suptitle(f'Step {cur_step}, Done = {d}\n' +
-		             f'std(o1 - o2))) = {np.std(o1 - o2):.4f}\treward = {r:.4f}')
+					 f'std(o1 - o2))) = {np.std(o1 - o2):.4f}\treward = {r:.4f}')
 		plt.pause(0.1)
 
 		o_list.append(o2.copy())
@@ -330,9 +332,9 @@ class RunningStats():
 
 	def __repr__(self):
 		return f"Mean: min={min(self.mean):.2f} max={max(self.mean):.2f}\n" \
-		       f"Std:  min={min(self.std):.2f}  max={max(self.std):.2f}\n" \
-		       f"Min = {self.Min}\n" \
-		       f"Max = {self.Max}"
+			   f"Std:  min={min(self.std):.2f}  max={max(self.std):.2f}\n" \
+			   f"Min = {self.Min}\n" \
+			   f"Max = {self.Max}"
 
 	def add(self, x):
 		self.n += 1
@@ -480,11 +482,11 @@ def dynamic_scale_adjustment_test():
 		ax.grid(which='both', color='gray')
 
 	fig.subplots_adjust(top=0.87,
-	                    bottom=0.085,
-	                    left=0.065,
-	                    right=0.96,
-	                    hspace=0.445,
-	                    wspace=0.2)
+						bottom=0.085,
+						left=0.065,
+						right=0.96,
+						hspace=0.445,
+						wspace=0.2)
 	plt.show()
 
 
@@ -516,7 +518,8 @@ def scaling_issue_test():
 	ax.plot(stats.mean, color='b', label='Mean')
 	ax.plot(norm_stats.mean, color='k', label='Norm Mean')
 	ax.fill_between(range(n_obs), stats.mean - stats.std, stats.mean + stats.std, color='b', alpha=0.4, label='Std')
-	ax.fill_between(range(n_obs), norm_stats.mean - norm_stats.std, norm_stats.mean + norm_stats.std, color='k', alpha=0.4, label='Norm Std')
+	ax.fill_between(range(n_obs), norm_stats.mean - norm_stats.std, norm_stats.mean + norm_stats.std, color='k',
+					alpha=0.4, label='Norm Std')
 
 	ax.legend(loc='best')
 	plt.show()
@@ -559,12 +562,13 @@ def save_stupid_env():
 	trim_stats = RunningStats(n_obs)
 
 	model_info = dict(rm=rm,
-	                  pi=pi,
-	                  trim_stats=trim_stats)
+					  pi=pi,
+					  trim_stats=trim_stats)
 
 	env = RandomEnv(n_obs, n_act, estimate_scaling=False, model_info=model_info)
 
 	env.save_dynamics('H:/Code/RandomEnvRLTests')
+
 
 def get_average_ep_len():
 	SZ = 10
@@ -582,11 +586,13 @@ def get_average_ep_len():
 	mean_ep_len = np.mean(ep_lens)
 	std_ep_len = np.std(ep_lens)
 	print(f'Episode length = {mean_ep_len} +- {std_ep_len}')
+
+
 if __name__ == '__main__':
 	# get_average_ep_len()
 	quick_testing_randomenv()
-	# get_model_output_bounds()
-	# dynamic_scale_adjustment_test()
-	# scaling_issue_test()
-	# test_saving_and_loading_dynamincs()
-	# save_stupid_env()
+# get_model_output_bounds()
+# dynamic_scale_adjustment_test()
+# scaling_issue_test()
+# test_saving_and_loading_dynamincs()
+# save_stupid_env()

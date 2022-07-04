@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 from random_env.envs import RandomEnv
 
+
 def generate_trajectory(env, policy, n_eps):
 	n_obs, n_act = env.obs_dimension, env.act_dimension
 	max_steps = env.max_steps
@@ -15,7 +16,7 @@ def generate_trajectory(env, policy, n_eps):
 	otp1_list = np.zeros((n_eps, max_steps, n_obs))
 	a_list = np.zeros((n_eps, max_steps, n_act))
 	r_list = np.zeros((n_eps, max_steps))
-	l_list = np.zeros(n_eps) # episode lengths
+	l_list = np.zeros(n_eps)  # episode lengths
 
 	for ep_idx in range(n_eps):
 		o = env.reset()
@@ -24,7 +25,7 @@ def generate_trajectory(env, policy, n_eps):
 
 			o_list[ep_idx, step] = o.copy()
 			a_list[ep_idx, step] = a
-			o,r,d,_ = env.step(a)
+			o, r, d, _ = env.step(a)
 			otp1_list[ep_idx, step] = o
 			r_list[ep_idx, step] = r
 			if d:
@@ -33,9 +34,10 @@ def generate_trajectory(env, policy, n_eps):
 
 	return dict(obs=o_list, act=a_list, obstp1=otp1_list, rew=r_list, eplen=l_list)
 
+
 sz = 3
-rm=np.diag(np.ones(sz))
-pi=rm.copy()
+rm = np.diag(np.ones(sz))
+pi = rm.copy()
 env = RandomEnv(sz, sz, estimate_scaling=False)
 env.rm = rm
 env.pi = pi
@@ -63,6 +65,8 @@ o_traj = []
 r_traj = []
 
 policy = lambda s: 0.2 * env.get_optimal_action(s)
+
+
 def get_features(s):
 	x1 = s.copy()
 	x2 = np.multiply(x1[:-1], x1[1:])
@@ -70,8 +74,9 @@ def get_features(s):
 	# x2 = np.square(s)
 	return np.concatenate([x1, x2])
 
+
 d = len(get_features(np.zeros(sz)))
-invA = (1/eps) * np.diag(np.ones(d))
+invA = (1 / eps) * np.diag(np.ones(d))
 b = np.zeros(d)
 
 for ep in range(N_EPS):
@@ -79,19 +84,19 @@ for ep in range(N_EPS):
 	x = get_features(o)
 	for step in range(MAX_STEPS):
 		a = policy(o)
-		otp1, r, d,_ = env.step(a)
+		otp1, r, d, _ = env.step(a)
 		xtp1 = get_features(otp1)
 
 		rhs = x - GAMMA * xtp1
-		v = invA.T@rhs
+		v = invA.T @ rhs
 
-		num = (invA@x)@(v.T)
-		den = 1 + (v.T)@x
-		invA = invA - num/den
+		num = (invA @ x) @ (v.T)
+		den = 1 + (v.T) @ x
+		invA = invA - num / den
 
 		b = b + r * x
 
-		w = invA@b
+		w = invA @ b
 
 		traj_invA.append(invA.copy())
 		traj_b.append(b.copy())
@@ -108,12 +113,12 @@ for ep in range(N_EPS):
 
 		if d:
 			break
-	l_list.append(step+1)
+	l_list.append(step + 1)
 
 print(f'average ep_len={np.mean(l_list):.2f} +/- {np.std(l_list):2f}')
 fig, _ = plt.subplots(3, 2)
 for ax, dat, lab in zip(fig.axes,
-						(np.array(traj_invA).reshape(-1, d*d), traj_b, traj_w, traj_v, traj_num, traj_den),
+						(np.array(traj_invA).reshape(-1, d * d), traj_b, traj_w, traj_v, traj_num, traj_den),
 						('invA', 'b', 'w', 'v', 'num', 'den')):
 	ax.plot(dat, label=lab)
 	ax.legend(loc='upper right')
@@ -122,8 +127,8 @@ fig.tight_layout()
 
 fig2, (ax1, ax2, ax3) = plt.subplots(3)
 for ax, dat, lab in zip(fig2.axes,
-                        (o_traj, a_traj, r_traj),
-                        ('o','a','r')):
+						(o_traj, a_traj, r_traj),
+						('o', 'a', 'r')):
 	ax.plot(dat, label=lab)
 	ax.legend(loc='upper right')
 fig2.tight_layout()
@@ -134,5 +139,3 @@ for lm in l_marker_pos:
 		ax.axvline(lm, color='k', alpha=0.5)
 
 plt.show()
-
-

@@ -21,19 +21,16 @@ print(f'Tilings shape = {tilings.shape}')
 print(f'Q-table shape = {qvf.q_tables.shape}')
 random_states = np.array([[-0.5, 0.5], [0.6, -0.6]])
 for random_state in random_states:
-    coding = get_tile_coding(random_state, tilings)
-    print(f'Random state = {random_state} -> Coding = {coding}')
-
+	coding = get_tile_coding(random_state, tilings)
+	print(f'Random state = {random_state} -> Coding = {coding}')
 
 fig, ax = plt.subplots()
 color = iter(plt.cm.jet(np.linspace(0, 1, nb_tilings)))
 for tiling, c, ls in zip(tilings, color, cycle(('-', '--', ':', '-.'))):
-    for tile, axfunc in zip(tiling, (ax.axhline, ax.axvline)):
-        for t in tile:
-            axfunc(t, color=c, linestyle=ls, linewidth=2)
+	for tile, axfunc in zip(tiling, (ax.axhline, ax.axvline)):
+		for t in tile:
+			axfunc(t, color=c, linestyle=ls, linewidth=2)
 plt.scatter(random_states.T[0], random_states.T[1], c='k', marker='x')
-ax.set_xlim((-1,1))
-ax.set_ylim((-1,1))
+ax.set_xlim((-1, 1))
+ax.set_ylim((-1, 1))
 plt.show()
-
-

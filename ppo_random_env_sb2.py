@@ -14,9 +14,9 @@ from random_env import RandomEnv
 
 
 class EvalCheckptEarlyStopTrainingCallback(BaseCallback):
-	MAX_EPS = 20 # Number of evaluation episodes to run the latest policy
-	END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES = 7 # self-explanatory
-	SUCCESS_THRESHOLD = 90.0 # Any mean success rate during evaluation greater than this is considered total success
+	MAX_EPS = 20  # Number of evaluation episodes to run the latest policy
+	END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES = 7  # self-explanatory
+	SUCCESS_THRESHOLD = 90.0  # Any mean success rate during evaluation greater than this is considered total success
 
 	def __init__(self, env, save_dir, EVAL_FREQ=100, CHKPT_FREQ=1000):
 		"""
@@ -98,8 +98,9 @@ class EvalCheckptEarlyStopTrainingCallback(BaseCallback):
 			act_mean = np.mean(actions)
 			act_std = np.std(actions)
 
-			for tag, val in zip(('episode_return', 'episode_length', 'success', 'spaces/obs_mean', 'spaces/obs_std', 'spaces/act_mean', 'spaces/act_std'),
-			                    (returns, ep_lens, success, obs_mean, obs_std, act_mean, act_std)):
+			for tag, val in zip(('episode_return', 'episode_length', 'success', 'spaces/obs_mean', 'spaces/obs_std',
+								 'spaces/act_mean', 'spaces/act_std'),
+								(returns, ep_lens, success, obs_mean, obs_std, act_mean, act_std)):
 				summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=val)])
 				self.locals['writer'].add_summary(summary, self.num_timesteps)
 
@@ -108,7 +109,7 @@ class EvalCheckptEarlyStopTrainingCallback(BaseCallback):
 				self.quick_save()
 				self.successes.append(success >= EvalCheckptEarlyStopTrainingCallback.SUCCESS_THRESHOLD)
 				if sum(self.successes) >= EvalCheckptEarlyStopTrainingCallback.END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES:
-					return False # End training
+					return False  # End training
 
 		if self.num_timesteps % self.CHKPT_FREQ == 0:
 			self.quick_save()
@@ -139,7 +140,7 @@ class EvalCheckptEarlyStopTrainingCallback(BaseCallback):
 
 		d = False
 		new_ylim = lambda ax, ydat: (np.min(np.concatenate([ax.get_ylim(), ydat])),
-		                             np.max(np.concatenate([ax.get_ylim(), ydat])))
+									 np.max(np.concatenate([ax.get_ylim(), ydat])))
 		while not d:
 			a = self.model.predict(o1, deterministic=True)[0]
 			o2, r, d, _ = self.env.step(a)
@@ -155,21 +156,20 @@ class EvalCheckptEarlyStopTrainingCallback(BaseCallback):
 		plt.close()
 
 
-
 ppo_params = dict(
-			gamma = 0.99,
-			n_steps = 512,
-			ent_coef = 0.01,
-			learning_rate = 2.5e-4,
-			vf_coef = 0.5,
-			max_grad_norm = 0.5,
-			lam = 0.95,
-			nminibatches = 4,
-			noptepochs = 4,
-			cliprange = 0.2,
-			cliprange_vf = None,
-			policy_kwargs = {'net_arch': [50, 50]}
-		)
+	gamma=0.99,
+	n_steps=512,
+	ent_coef=0.01,
+	learning_rate=2.5e-4,
+	vf_coef=0.5,
+	max_grad_norm=0.5,
+	lam=0.95,
+	nminibatches=4,
+	noptepochs=4,
+	cliprange=0.2,
+	cliprange_vf=None,
+	policy_kwargs={'net_arch': [50, 50]}
+)
 random_seed = 123
 nb_steps = int(5e5)
 par_dir = os.path.join('param_random_env_results', dt.strftime(dt.now(), 'training_session_%m%d%y_%H%M%S'))
@@ -187,7 +187,7 @@ eval_env = deepcopy(env)
 
 model_name = f'PPO_random_env_{n_obs}x{n_act}'
 log_dir = os.path.join(par_dir, 'logs')
-save_dir = os.path.join(par_dir,  model_name)
+save_dir = os.path.join(par_dir, model_name)
 
 for path in (log_dir, save_dir):
 	if not os.path.exists(path):
@@ -197,9 +197,8 @@ model = PPO2(PPOPolicy, env, **ppo_params, verbose=1,
 			 tensorboard_log=log_dir, _init_setup_model=True,
 			 full_tensorboard_log=False, seed=random_seed, n_cpu_tf_sess=None)
 
-
 eval_callback = EvalCheckptEarlyStopTrainingCallback(eval_env, save_dir=save_dir,
-                                                     EVAL_FREQ=100, CHKPT_FREQ=1000)
+													 EVAL_FREQ=100, CHKPT_FREQ=1000)
 
 with open(os.path.join(save_dir, 'info.txt'), 'w') as f:
 	f.write('-> PPO parameters\n')
@@ -208,6 +207,4 @@ with open(os.path.join(save_dir, 'info.txt'), 'w') as f:
 	f.write(f'-> Info: Environment estimated scaling:\n\t{eval_env.trim_stats}\n')
 	f.write(f'-> Info: Environment model output normalised\n')
 model.learn(total_timesteps=nb_steps, log_interval=10, reset_num_timesteps=True,
-            tb_log_name=model_name, callback=eval_callback)
-
-
+			tb_log_name=model_name, callback=eval_callback)

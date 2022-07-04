@@ -1,4 +1,5 @@
 import os
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 from tensorlayer.optimizers import AMSGrad
@@ -18,14 +19,14 @@ env = RandomEnv(n_obs, n_act, estimate_scaling=True)
 state_space = env.observation_space
 
 critic_model = ValueNetwork(state_space=state_space,
-                            hidden_dim_list=[50, 50])
+							hidden_dim_list=[50, 50])
 policy_model = StochasticPolicyNetwork(state_space=state_space,
-                                       action_space=env.action_space,
-                                       hidden_dim_list=[50, 50])
+									   action_space=env.action_space,
+									   hidden_dim_list=[50, 50])
 
 optimizers_list = [AMSGrad(learning_rate=1e-2)]
 
 agent = TRPO([critic_model, policy_model], optimizers_list)
 agent.learn(env, train_episodes=500, test_episodes=100, max_steps=100, save_interval=100,
-              gamma=0.9, mode='train', render=False, batch_size=32, backtrack_iters=10, backtrack_coeff=0.8,
-              train_critic_iters=80, plot_func=None)
+			gamma=0.9, mode='train', render=False, batch_size=32, backtrack_iters=10, backtrack_coeff=0.8,
+			train_critic_iters=80, plot_func=None)

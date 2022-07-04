@@ -3,6 +3,7 @@ import numpy as np
 from datetime import datetime as dt
 from collections import deque
 import comet_ml
+
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 import torch as t
 
@@ -13,6 +14,8 @@ from random_env.envs import RandomEnv, RunningStats
 from my_agents_utils import make_path_exist, get_writer, count_parameters
 
 CUR_EXP_IDX = 0
+
+
 class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
 	MAX_EPS = 20  # Number of evaluation episodes to run the latest policy
 	END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES = 2  # self-explanatory
@@ -45,7 +48,8 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
 
 		self.gamma = 0.99
 		self.discounts = [np.power(self.gamma, i) for i in range(self.env.EPISODE_LENGTH_LIMIT)]
-		self.successes = deque(maxlen=EvalCheckpointEarlyStopTrainingCallback.END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES)
+		self.successes = deque(
+			maxlen=EvalCheckpointEarlyStopTrainingCallback.END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES)
 		super(EvalCheckpointEarlyStopTrainingCallback, self).__init__()
 
 		self.steps_since_last_animation = 0
@@ -64,8 +68,9 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
 			print("Saving model checkpoint to {}".format(save_path))
 
 		self.model.save(save_path)
-		# if self.verbose > 0:
-		# 	print(f'Model NOT saved to: {save_path}')
+
+	# if self.verbose > 0:
+	# 	print(f'Model NOT saved to: {save_path}')
 
 	def _on_step(self):
 		self.num_timesteps = self.model.num_timesteps
@@ -156,8 +161,8 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
 				print(f'\t-> FPS = {fps:.2f}')
 				print('')
 
-			self.logger.log_metrics({'eval/episode_return':returns,
-									 'eval/episode_length':ep_lens,
+			self.logger.log_metrics({'eval/episode_return': returns,
+									 'eval/episode_length': ep_lens,
 									 'eval/success': success,
 									 'eval/rew_final_neg_init': rew_final_neg_init,
 									 'eval/expected_rew_per_step': expected_rew_per_step,
@@ -181,6 +186,7 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
 			self.quick_save()
 
 		return True
+
 
 COMET_WORKSPACE = 'testing-ppo-trpo'
 algo = 'TRPO'
@@ -253,7 +259,6 @@ elif 'TRPO' in algo:
 		_init_setup_model=True
 	)
 
-
 NB_STEPS = int(7e6)
 EVAL_FREQ = 2000
 CHKPT_FREQ = 50000
@@ -265,7 +270,6 @@ save_dir = os.path.join(par_dir, 'saves')
 log_dir = os.path.join(par_dir, 'logs')
 for d in (save_dir, log_dir):
 	make_path_exist(d)
-
 
 for env_sz in np.arange(2, 11):
 	N_OBS = env_sz
@@ -331,7 +335,4 @@ for env_sz in np.arange(2, 11):
 			'''Start training'''
 			model.learn(total_timesteps=NB_STEPS, callback=eval_callback)
 
-
 			CUR_EXP_IDX += 1
-
-
