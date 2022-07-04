@@ -12,10 +12,10 @@ acts = []
 o = env.reset()
 d = False
 while not d:
-	obses.append(np.copy(o))
-	a = env.get_optimal_action(o)
-	acts.append(np.copy(a))
-	o, _, d, _ = env.step(a)
+    obses.append(np.copy(o))
+    a = env.get_optimal_action(o)
+    acts.append(np.copy(a))
+    o, _, d, _ = env.step(a)
 
 fig, ax = plt.subplots()
 ax.plot(obses, color='b')

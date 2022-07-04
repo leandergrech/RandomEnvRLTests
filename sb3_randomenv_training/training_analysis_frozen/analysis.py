@@ -15,43 +15,43 @@ experiments = api.get(COMET_WORKSPACE_NAME, COMET_PROJECT_NAME)
 
 
 def get_experiment_by_name(name):
-	for e in experiments:
-		if name in e.get_name():
-			return e
+    for e in experiments:
+        if name in e.get_name():
+            return e
 
 
 def get_metric_list(experiment, metric_name):
-	raw_data = experiment.get_metrics(metric_name)
-	data = []
-	steps = []
-	for item in raw_data:
-		data.append(item['metricValue'])
-		steps.append(item['step'])
-	return data, steps
+    raw_data = experiment.get_metrics(metric_name)
+    data = []
+    steps = []
+    for item in raw_data:
+        data.append(item['metricValue'])
+        steps.append(item['step'])
+    return data, steps
 
 
 data = defaultdict(list)
 for filename in os.listdir('csv'):
-	env_sz, *_ = [int(item) for item in re.findall(r'\d+', filename)]
+    env_sz, *_ = [int(item) for item in re.findall(r'\d+', filename)]
 
-	# Get experiment names from this file
-	with open(os.path.join('csv', filename), 'r') as csvfile:
-		csvreader = csv.reader(csvfile)
-		for row in csvreader:
-			expname = row[0]
-			if 'Name' in expname: continue
-			e = get_experiment_by_name(expname)
-			_, steps = get_metric_list(e, 'eval/success')
-			print(f'{expname}\t{env_sz}x{env_sz}\ttotal training steps = {steps[-1]}')
+    # Get experiment names from this file
+    with open(os.path.join('csv', filename), 'r') as csvfile:
+        csvreader = csv.reader(csvfile)
+        for row in csvreader:
+            expname = row[0]
+            if 'Name' in expname: continue
+            e = get_experiment_by_name(expname)
+            _, steps = get_metric_list(e, 'eval/success')
+            print(f'{expname}\t{env_sz}x{env_sz}\ttotal training steps = {steps[-1]}')
 
-			data[env_sz].append(steps[-1])
+            data[env_sz].append(steps[-1])
 
 fig, ax = plt.subplots()
 nb_training_steps_mean_list = {}
 for env_sz, nb_training_steps in data.items():
-	x = np.repeat(env_sz, len(nb_training_steps))
-	ax.scatter(x, nb_training_steps, marker='x')
-	nb_training_steps_mean_list[env_sz] = np.mean(nb_training_steps)
+    x = np.repeat(env_sz, len(nb_training_steps))
+    ax.scatter(x, nb_training_steps, marker='x')
+    nb_training_steps_mean_list[env_sz] = np.mean(nb_training_steps)
 
 sizes = np.arange(min(nb_training_steps_mean_list), max(nb_training_steps_mean_list) + 1)
 means = [nb_training_steps_mean_list[item] for item in sizes]

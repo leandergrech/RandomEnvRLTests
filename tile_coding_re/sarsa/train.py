@@ -36,26 +36,26 @@ Directory  handling
 '''
 # par_dir = f'{repr(env)}_{NB_BINS}bins_{NB_TILINGS}tilings_{LR}lr_{GREEDY_EPS}eps-greedy'
 if os.path.exists(par_dir):
-	print(f"Run with these hparams already made: {par_dir}")
-	ans = input('Continue? [Y/n]')
-	if ans.lower() == 'y' or ans == '':
-		title_found = False
-		title_idx = 1
-		temp = None
-		while not title_found:
-			temp = par_dir + f'_{title_idx}'
-			title_found = not os.path.exists(temp)
-			title_idx += 1
-		par_dir = temp
-		print(f'Continuing in directory: {par_dir}')
-	else:
-		exit(42)
+    print(f"Run with these hparams already made: {par_dir}")
+    ans = input('Continue? [Y/n]')
+    if ans.lower() == 'y' or ans == '':
+        title_found = False
+        title_idx = 1
+        temp = None
+        while not title_found:
+            temp = par_dir + f'_{title_idx}'
+            title_found = not os.path.exists(temp)
+            title_idx += 1
+        par_dir = temp
+        print(f'Continuing in directory: {par_dir}')
+    else:
+        exit(42)
 save_path = os.path.join(par_dir, 'saves')
 os.makedirs(save_path)
 # save training parameters
 with open('constants.py', 'r') as readfile, open(os.path.join(par_dir, 'info.md'), 'a') as writefile:
-	for line in readfile:
-		writefile.write(line)
+    for line in readfile:
+        writefile.write(line)
 
 '''
 Save dynamics
@@ -70,11 +70,11 @@ buffer = TrajBuffer()
 
 
 def policy(state):
-	if np.random.rand() < GREEDY_EPS:  # or T < NB_INIT_STEPS:
-		return env.action_space.sample()
-	else:
-		# greedy selection of action with the largest value
-		return qvf.greedy_action(state)
+    if np.random.rand() < GREEDY_EPS:  # or T < NB_INIT_STEPS:
+        return env.action_space.sample()
+    else:
+        # greedy selection of action with the largest value
+        return qvf.greedy_action(state)
 
 
 MAX_STEPS_POSSIBLE = NB_TRAINING_EPS * env.max_steps
@@ -89,44 +89,44 @@ visited_states = np.zeros((env.obs_dimension, nb_discretization_bins))
 
 training_t = 0
 for ep in trange(NB_TRAINING_EPS):
-	ep_t = 0
-	d = False
+    ep_t = 0
+    d = False
 
-	o = env.reset()
-	a1 = policy(o)
-	while not d:
-		otp1, r, d, info = env.step(a1)
-		a2 = policy(otp1)
+    o = env.reset()
+    a1 = policy(o)
+    while not d:
+        otp1, r, d, info = env.step(a1)
+        a2 = policy(otp1)
 
-		if r < -1.:
-			r *= 10.0
+        if r < -1.:
+            r *= 10.0
 
-		if info['success']:
-			target = r  # setting value of terminal state to zero
-		else:
-			target = r + GAMMA * qvf.value(otp1, a2)
+        if info['success']:
+            target = r  # setting value of terminal state to zero
+        else:
+            target = r + GAMMA * qvf.value(otp1, a2)
 
-		qvf.update(o, a1, target)
+        qvf.update(o, a1, target)
 
-		o = otp1
-		a1 = a2
+        o = otp1
+        a1 = a2
 
-		time_steps_vs_ep[training_t] = ep
-		td_errors_rolling.append(target - qvf.value(o, a1))
-		for dim, o_ in enumerate(otp1):
-			bidx = np.digitize(o_, state_discretization)
-			visited_states[dim, bidx] += 1
+        time_steps_vs_ep[training_t] = ep
+        td_errors_rolling.append(target - qvf.value(o, a1))
+        for dim, o_ in enumerate(otp1):
+            bidx = np.digitize(o_, state_discretization)
+            visited_states[dim, bidx] += 1
 
-		ep_t += 1
-		training_t += 1
+        ep_t += 1
+        training_t += 1
 
-	ep_lens[ep] = ep_t
-	td_errors_mean[ep] = np.mean(td_errors_rolling)
+    ep_lens[ep] = ep_t
+    td_errors_mean[ep] = np.mean(td_errors_rolling)
 
-	# logging
-	if (ep + 1) % SAVE_EVERY == 0:
-		# print(f"Episode {ep+1}")
-		qvf.save(os.path.join(save_path, f'{ep + 1}ep'))
+    # logging
+    if (ep + 1) % SAVE_EVERY == 0:
+        # print(f"Episode {ep+1}")
+        qvf.save(os.path.join(save_path, f'{ep + 1}ep'))
 time_steps_vs_ep = time_steps_vs_ep[:training_t]
 
 np.save(os.path.join(par_dir, 'training_ep_lens.npy'), ep_lens)
@@ -156,18 +156,18 @@ ax3.set_ylabel('Visited states counter')
 
 plt.minorticks_on()
 for ax in fig.axes:
-	ax.set_xlabel('Training episodes')
-	ax.legend(loc='best')
-	ax.grid(which='major')
-	ax.grid(which='minor', ls=':')
+    ax.set_xlabel('Training episodes')
+    ax.legend(loc='best')
+    ax.grid(which='major')
+    ax.grid(which='minor', ls=':')
 fig.tight_layout()
 plt.savefig(os.path.join(par_dir, 'training_ep_lens_td_errors_visited_states.png'))
 
 fig, ax = plt.subplots()
 fig.suptitle(fig_title)
 ax.plot(np.arange(MAX_STEPS_POSSIBLE),
-		np.repeat(np.arange(NB_TRAINING_EPS), env.max_steps),
-		c='k', ls='dashed', lw=0.5, label='Worst case')
+        np.repeat(np.arange(NB_TRAINING_EPS), env.max_steps),
+        c='k', ls='dashed', lw=0.5, label='Worst case')
 ax.plot(np.arange(training_t), time_steps_vs_ep, c='r', label='Training')
 ax.set_xlabel('Time steps')
 ax.set_ylabel('Training episodes')

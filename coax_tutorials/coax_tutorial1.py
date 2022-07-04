@@ -10,8 +10,8 @@ env = coax.wrappers.TrainMonitor(env)
 
 
 def forward_pass(S, is_training):
-	lin = hk.Linear(env.action_space.n, w_init=jnp.zeros)
-	return lin(S)
+    lin = hk.Linear(env.action_space.n, w_init=jnp.zeros)
+    return lin(S)
 
 
 q = coax.Q(forward_pass, env)
@@ -27,21 +27,21 @@ nstep = coax.reward_tracing.NStep(n=1, gamma=0.9)
 render = lambda: print(env.render(mode='ansi'))
 
 for ep in range(500):
-	s = env.reset()
-	for t in range(env.spec.max_episode_steps):
-		a = env.action_space.sample()
-		stp1, r, d, info = env.step(a)
+    s = env.reset()
+    for t in range(env.spec.max_episode_steps):
+        a = env.action_space.sample()
+        stp1, r, d, info = env.step(a)
 
-		# update
-		nstep.add(s, a, r, d)
-		while nstep:
-			transition = nstep.pop()
-			qlearning.update(transition)
+        # update
+        nstep.add(s, a, r, d)
+        while nstep:
+            transition = nstep.pop()
+            qlearning.update(transition)
 
-		if d:
-			break
+        if d:
+            break
 
-		s = stp1
+        s = stp1
 
 for _ in range(10):
-	coax.render_episode(env, policy=pi.mode)
+    coax.render_episode(env, policy=pi.mode)

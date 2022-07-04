@@ -6,44 +6,44 @@ gamma = 0.99
 
 
 def compute1(batch_rews):
-	global gamma
+    global gamma
 
-	q_vals = []
-	for rewards in batch_rews:
-		discount_pows = t.pow(gamma, t.arange(0, rewards.size(0)).float())
-		discounted_rewards = rewards * discount_pows
-		disc_reward_sums = t.cumsum(discounted_rewards.flip(0), dim=-1).flip(0)
-		trajectory_q_vals = disc_reward_sums / discount_pows
-		q_vals.append(trajectory_q_vals.numpy())
+    q_vals = []
+    for rewards in batch_rews:
+        discount_pows = t.pow(gamma, t.arange(0, rewards.size(0)).float())
+        discounted_rewards = rewards * discount_pows
+        disc_reward_sums = t.cumsum(discounted_rewards.flip(0), dim=-1).flip(0)
+        trajectory_q_vals = disc_reward_sums / discount_pows
+        q_vals.append(trajectory_q_vals.numpy())
 
-	return t.tensor(q_vals)
+    return t.tensor(q_vals)
 
 
 def compute2(batch_rews):
-	global gamma
+    global gamma
 
-	q_vals = t.zeros_like(batch_rews)
-	for i, rewards in enumerate(batch_rews):  # reverse maintains order on append
-		reverse = t.arange(rewards.size(0) - 1, -1, -1)
-		discount_pows = t.pow(gamma, t.arange(0, rewards.size(0)).float())
-		discounted_rewards = rewards * discount_pows
-		disc_reward_sums = t.cumsum(discounted_rewards[reverse], dim=-1)[reverse]
-		trajectory_q_vals = disc_reward_sums / discount_pows
-		q_vals[i] = trajectory_q_vals
+    q_vals = t.zeros_like(batch_rews)
+    for i, rewards in enumerate(batch_rews):  # reverse maintains order on append
+        reverse = t.arange(rewards.size(0) - 1, -1, -1)
+        discount_pows = t.pow(gamma, t.arange(0, rewards.size(0)).float())
+        discounted_rewards = rewards * discount_pows
+        disc_reward_sums = t.cumsum(discounted_rewards[reverse], dim=-1)[reverse]
+        trajectory_q_vals = disc_reward_sums / discount_pows
+        q_vals[i] = trajectory_q_vals
 
-	return q_vals
+    return q_vals
 
 
 from datetime import datetime as dt
 
 
 def timeit(func, inputs, number=1000):
-	start = dt.now()
-	for _ in range(number):
-		func(*inputs)
-	end = dt.now()
+    start = dt.now()
+    for _ in range(number):
+        func(*inputs)
+    end = dt.now()
 
-	return end - start
+    return end - start
 
 
 c1_time = timeit(compute1, (arr,))

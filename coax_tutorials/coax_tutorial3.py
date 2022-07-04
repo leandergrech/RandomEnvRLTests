@@ -14,32 +14,32 @@ env = coax.wrappers.TrainMonitor(env, name=name, tensorboard_dir=f"./data/tensor
 
 
 def shared(S, is_training):
-	seq = hk.Sequential([
-		coax.utils.diff_transform,
-		hk.Conv2D(16, kernel_shape=8, stride=4), jax.nn.relu,
-		hk.Conv2D(32, kernel_shape=4, stride=2), jax.nn.relu,
-		hk.Flatten(),
-	])
-	X = jnp.stack(S, axis=-1) / 225.  # stack frames
-	return seq(X)
+    seq = hk.Sequential([
+        coax.utils.diff_transform,
+        hk.Conv2D(16, kernel_shape=8, stride=4), jax.nn.relu,
+        hk.Conv2D(32, kernel_shape=4, stride=2), jax.nn.relu,
+        hk.Flatten(),
+    ])
+    X = jnp.stack(S, axis=-1) / 225.  # stack frames
+    return seq(X)
 
 
 def func_pi(S, is_training):
-	logits = hk.Sequential((
-		hk.Linear(256), jax.nn.relu,
-		hk.Linear(env.action_space.n, w_init=jnp.zeros)
-	))
-	X = shared(S, is_training)
-	return {'logits': logits(X)}
+    logits = hk.Sequential((
+        hk.Linear(256), jax.nn.relu,
+        hk.Linear(env.action_space.n, w_init=jnp.zeros)
+    ))
+    X = shared(S, is_training)
+    return {'logits': logits(X)}
 
 
 def func_v(S, is_training):
-	value = hk.Sequential((
-		hk.Linear(256), jax.nn.relu,
-		hk.Linear(1, w_init=jnp.zeros), jnp.ravel
-	))
-	X = shared(S, is_training)
-	return value(X)
+    value = hk.Sequential((
+        hk.Linear(256), jax.nn.relu,
+        hk.Linear(1, w_init=jnp.zeros), jnp.ravel
+    ))
+    X = shared(S, is_training)
+    return value(X)
 
 
 # function approximators
@@ -67,39 +67,39 @@ buffer = coax.experience_replay.SimpleReplayBuffer(capacity=BUFFER_SIZE)
 
 # run episodes
 while env.T < int(3e6):
-	s = env.reset()
-	for t in range(env.spec.max_episode_steps):
-		a, logp = pi_behaviour(s, return_logp=True)
-		stp1, r, d, _ = env.step(a)
+    s = env.reset()
+    for t in range(env.spec.max_episode_steps):
+        a, logp = pi_behaviour(s, return_logp=True)
+        stp1, r, d, _ = env.step(a)
 
-		# trace rewards and add transition to replay buffer
-		tracer.add(s, a, r, d, logp)
-		while tracer:
-			buffer.add(tracer.pop())
+        # trace rewards and add transition to replay buffer
+        tracer.add(s, a, r, d, logp)
+        while tracer:
+            buffer.add(tracer.pop())
 
-		# learn
-		if len(buffer) >= buffer.capacity:
-			num_batches = int(NB_EPOCHS * buffer.capacity / BATCH_SIZE)  # NB_EPOCHS epochs per loop
-			for _ in range(num_batches):
-				transition_batch = buffer.sample(BATCH_SIZE)
-				metrics_v, td_error = simpletd.update(transition_batch, return_td_error=True)
-				metrics_pi = ppo_clip.update(transition_batch, td_error)
-				env.record_metrics(metrics_v)
-				env.record_metrics(metrics_pi)
-			# since on-policy, clear buffer
-			buffer.clear()
+        # learn
+        if len(buffer) >= buffer.capacity:
+            num_batches = int(NB_EPOCHS * buffer.capacity / BATCH_SIZE)  # NB_EPOCHS epochs per loop
+            for _ in range(num_batches):
+                transition_batch = buffer.sample(BATCH_SIZE)
+                metrics_v, td_error = simpletd.update(transition_batch, return_td_error=True)
+                metrics_pi = ppo_clip.update(transition_batch, td_error)
+                env.record_metrics(metrics_v)
+                env.record_metrics(metrics_pi)
+            # since on-policy, clear buffer
+            buffer.clear()
 
-			# sync target networks
-			pi_behaviour.soft_update(pi, tau=0.1)
-			v_targ.soft_update(v, tau=0.1)
+            # sync target networks
+            pi_behaviour.soft_update(pi, tau=0.1)
+            v_targ.soft_update(v, tau=0.1)
 
-		if d:
-			break
-		s = stp1
+        if d:
+            break
+        s = stp1
 
-	# generate an animated GIF to see what's happening
-	if env.period(name='generate_gif', T_period=10000) and env.T > 50000:
-		T = env.T - env.T % 10000  # round to 10000s
-		coax.utils.generate_gif(
-			env=env, policy=pi, resize_to=(320, 420),
-			filepath=f"./data/gifs/{name}/T{T:08d}.gif")
+    # generate an animated GIF to see what's happening
+    if env.period(name='generate_gif', T_period=10000) and env.T > 50000:
+        T = env.T - env.T % 10000  # round to 10000s
+        coax.utils.generate_gif(
+            env=env, policy=pi, resize_to=(320, 420),
+            filepath=f"./data/gifs/{name}/T{T:08d}.gif")

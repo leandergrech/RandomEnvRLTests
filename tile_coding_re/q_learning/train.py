@@ -34,20 +34,20 @@ Directory  handling
 par_dir = f'{repr(env)}_{NB_BINS}bins_{NB_TILINGS}tilings_{LR}lr_{GREEDY_EPS}eps-greedy'
 save_path = os.path.join(par_dir, 'saves')
 if os.path.exists(par_dir):
-	print(f"Run with these hparams already made: {par_dir}")
-	ans = input('Continue? [Y/n]')
-	if ans.lower() == 'y' or ans == '':
-		title_found = False
-		title_idx = 1
-		temp = None
-		while not title_found:
-			temp = par_dir + f'_{title_idx}'
-			title_found = not os.path.exists(temp)
-			title_idx += 1
-		par_dir = temp
-		print(f'Continuing in directory: {par_dir}')
-	else:
-		exit(42)
+    print(f"Run with these hparams already made: {par_dir}")
+    ans = input('Continue? [Y/n]')
+    if ans.lower() == 'y' or ans == '':
+        title_found = False
+        title_idx = 1
+        temp = None
+        while not title_found:
+            temp = par_dir + f'_{title_idx}'
+            title_found = not os.path.exists(temp)
+            title_idx += 1
+        par_dir = temp
+        print(f'Continuing in directory: {par_dir}')
+    else:
+        exit(42)
 
 os.makedirs(save_path)
 
@@ -64,41 +64,41 @@ buffer = TrajBuffer()
 
 
 def policy(state):
-	if np.random.rand() < GREEDY_EPS:  # or T < NB_INIT_STEPS:
-		return env.action_space.sample()
-	else:
-		# greedy selection of action with the largest value
-		return qvf.greedy_action(state)
+    if np.random.rand() < GREEDY_EPS:  # or T < NB_INIT_STEPS:
+        return env.action_space.sample()
+    else:
+        # greedy selection of action with the largest value
+        return qvf.greedy_action(state)
 
 
 T = 0
 time_steps_vs_ep = []
 for ep in range(NB_TRAINING_EPS):
-	buffer.reset()
-	d = False
+    buffer.reset()
+    d = False
 
-	o = env.reset()
-	a1 = policy(o)
-	while not d:
-		otp1, r, d, info = env.step(a1)
-		a2 = policy(otp1)
+    o = env.reset()
+    a1 = policy(o)
+    while not d:
+        otp1, r, d, info = env.step(a1)
+        a2 = policy(otp1)
 
-		if info['success']:
-			target = 0.0
-		else:
-			target = r + GAMMA * qvf.value(otp1, a2)
+        if info['success']:
+            target = 0.0
+        else:
+            target = r + GAMMA * qvf.value(otp1, a2)
 
-		qvf.update(o, a1, target)
+        qvf.update(o, a1, target)
 
-		o = otp1
-		a1 = a2
-		T += 1
-		time_steps_vs_ep.append([T, ep])
+        o = otp1
+        a1 = a2
+        T += 1
+        time_steps_vs_ep.append([T, ep])
 
-	# logging
-	if (ep + 1) % SAVE_EVERY == 0:
-		print(f"Episode {ep + 1}")
-		qvf.save(os.path.join(save_path, f'{ep + 1}ep'))
+    # logging
+    if (ep + 1) % SAVE_EVERY == 0:
+        print(f"Episode {ep + 1}")
+        qvf.save(os.path.join(save_path, f'{ep + 1}ep'))
 
 fig, ax = plt.subplots()
 tok = par_dir.split('_')

@@ -13,16 +13,16 @@ actions = get_discrete_actions(2)
 buffer = TrajBuffer()
 
 for ep in range(5):
-	buffer.reset()
-	o = env.reset()
-	d = False
-	while not d:
-		a = env.get_optimal_action(o)
-		otp1, r, d, _ = env.step(a)
+    buffer.reset()
+    o = env.reset()
+    d = False
+    while not d:
+        a = env.get_optimal_action(o)
+        otp1, r, d, _ = env.step(a)
 
-		buffer.add(o, a, r)
-		o = otp1
+        buffer.add(o, a, r)
+        o = otp1
 
-	fig, ax1 = plt.subplots()
-	ax1.plot(buffer.o)
+    fig, ax1 = plt.subplots()
+    ax1.plot(buffer.o)
 plt.show()

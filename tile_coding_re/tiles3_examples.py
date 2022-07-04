@@ -8,12 +8,12 @@ from math import cos, sin, sqrt
 
 
 def actual_func(x, y):
-	# return sign(x*y)
-	# return sin(4*x + pi/3.) * cos(4*y)
-	x *= 2.
-	y *= 2.
-	res = (1 + (x ** 2 + y ** 2)) / ((x ** 2 + y ** 2) + 2)
-	return (1 - res) * 10
+    # return sign(x*y)
+    # return sin(4*x + pi/3.) * cos(4*y)
+    x *= 2.
+    y *= 2.
+    res = (1 + (x ** 2 + y ** 2)) / ((x ** 2 + y ** 2) + 2)
+    return (1 - res) * 10
 
 
 maxSize = 2 ** 15
@@ -58,56 +58,57 @@ clipYCoarse = clip * scaleFactorYCoarse
 # clipXFine = clip * scaleFactorXFine
 # clipYFine = clip * scaleFactorYFine
 def mytiles(x, y):
-	XCoarse = x * scaleFactorXCoarse
-	YCoarse = y * scaleFactorYCoarse
+    XCoarse = x * scaleFactorXCoarse
+    YCoarse = y * scaleFactorYCoarse
 
-	# XFine = x*scaleFactorXFine
-	# YFine = y*scaleFactorYFine
-	return tiles(iht2, numTilingsCoarse, [XCoarse, YCoarse])
+    # XFine = x*scaleFactorXFine
+    # YFine = y*scaleFactorYFine
+    return tiles(iht2, numTilingsCoarse, [XCoarse, YCoarse])
 
 
 def mytiles2(x, y):
-	XCoarse = x * scaleFactorXCoarse
-	YCoarse = y * scaleFactorYCoarse
-	return tilesasymmetric(iht, numTilingsCoarse, [XCoarse, YCoarse], (1, 3))
+    XCoarse = x * scaleFactorXCoarse
+    YCoarse = y * scaleFactorYCoarse
+    return tilesasymmetric(iht, numTilingsCoarse, [XCoarse, YCoarse], (1, 3))
 
-	# return tilesclip(iht, numTilingsCoarse, [XCoarse, YCoarse],
-	#                  ((-inf, -clipXCoarse), (-inf, -clipYCoarse)), [0]) + \
-	#     tilesclip(iht, numTilingsCoarse, [XCoarse, YCoarse],
-	#               ((clipXCoarse, inf), (clipYCoarse, inf)), [1]) + \
-	#     tilesclip(iht, numTilingsFine, [XFine, YFine],
-	#               ((-clipXFine, clipXFine), (-clipYFine, clipYFine)), [2])# + \
-	# return tilesclip(iht, numTilingsCoarse, [XFine],
-	#               [[-inf, -clipXCoarse]], [3]) + \
-	#     tilesclip(iht, numTilingsCoarse, [XFine],
-	#               [[clipXCoarse, inf]], [4]) + \
-	#     tilesclip(iht, numTilingsCoarse, [YFine],
-	#               [[-inf, -clipYCoarse]], [5]) + \
-	#     tilesclip(iht, numTilingsCoarse, [YFine],
-	#               [[clipYCoarse, inf]], [6])
+
+# return tilesclip(iht, numTilingsCoarse, [XCoarse, YCoarse],
+#                  ((-inf, -clipXCoarse), (-inf, -clipYCoarse)), [0]) + \
+#     tilesclip(iht, numTilingsCoarse, [XCoarse, YCoarse],
+#               ((clipXCoarse, inf), (clipYCoarse, inf)), [1]) + \
+#     tilesclip(iht, numTilingsFine, [XFine, YFine],
+#               ((-clipXFine, clipXFine), (-clipYFine, clipYFine)), [2])# + \
+# return tilesclip(iht, numTilingsCoarse, [XFine],
+#               [[-inf, -clipXCoarse]], [3]) + \
+#     tilesclip(iht, numTilingsCoarse, [XFine],
+#               [[clipXCoarse, inf]], [4]) + \
+#     tilesclip(iht, numTilingsCoarse, [YFine],
+#               [[-inf, -clipYCoarse]], [5]) + \
+#     tilesclip(iht, numTilingsCoarse, [YFine],
+#               [[clipYCoarse, inf]], [6])
 
 
 def test(x, y, w, t):
-	tiles = t(x, y)
-	estimate = 0
-	for tile in tiles:
-		estimate += w[tile]
-	return estimate
+    tiles = t(x, y)
+    estimate = 0
+    for tile in tiles:
+        estimate += w[tile]
+    return estimate
 
 
 def learn(x, y, z, w, t):
-	tiles = t(x, y)
-	estimate = test(x, y, w, t)
-	error = z - estimate
-	for tile in tiles:
-		w[tile] += lr() * error  # learn weights
+    tiles = t(x, y)
+    estimate = test(x, y, w, t)
+    error = z - estimate
+    for tile in tiles:
+        w[tile] += lr() * error  # learn weights
 
 
 # Function to learn
 zr = [[0. for _ in range(len(xr))] for _ in range(len(yr))]
 for i, y in enumerate(yr):
-	for j, x in enumerate(xr):
-		zr[i][j] = actual_func(x, y)
+    for j, x in enumerate(xr):
+        zr[i][j] = actual_func(x, y)
 
 # Placeholder for estimate
 zest = [[0. for _ in range(len(xrtest))] for _ in range(len(yrtest))]
@@ -130,26 +131,26 @@ error = []
 nb_timesteps = 5000
 eval_every = 50
 for t in range(nb_timesteps):
-	# [i, j] = choice(dim_size, 2)
-	# x = xr[i]
-	# y = yr[j]
-	# z = zr[i][j]
-	x, y = randn(2)
-	z = actual_func(x, y)
+    # [i, j] = choice(dim_size, 2)
+    # x = xr[i]
+    # y = yr[j]
+    # z = zr[i][j]
+    x, y = randn(2)
+    z = actual_func(x, y)
 
-	# error.append(z - test(x, y))
-	learn(x, y, z, weights, mytiles)
-	learn(x, y, z, weights2, mytiles2)
+    # error.append(z - test(x, y))
+    learn(x, y, z, weights, mytiles)
+    learn(x, y, z, weights2, mytiles2)
 
-	if (t + 1) % eval_every == 0:
-		for i, x in enumerate(xrtest):
-			for j, y in enumerate(yrtest):
-				zest[i][j] = test(x, y, weights, mytiles)
-				zest2[i][j] = test(x, y, weights2, mytiles2)
-		update_heatmap(im2, zest, f'mytiles\nTraining step {t + 1:4d}\nIHT count {iht.count():6d}')
-		update_heatmap(im3, zest2, f'mytiles2\nTraining step {t + 1:4d}\nIHT count {iht2.count():6d}')
-		# ax2.set_title()
-		plt.pause(0.05)
+    if (t + 1) % eval_every == 0:
+        for i, x in enumerate(xrtest):
+            for j, y in enumerate(yrtest):
+                zest[i][j] = test(x, y, weights, mytiles)
+                zest2[i][j] = test(x, y, weights2, mytiles2)
+        update_heatmap(im2, zest, f'mytiles\nTraining step {t + 1:4d}\nIHT count {iht.count():6d}')
+        update_heatmap(im3, zest2, f'mytiles2\nTraining step {t + 1:4d}\nIHT count {iht2.count():6d}')
+        # ax2.set_title()
+        plt.pause(0.05)
 plt.ioff()
 print(iht.count())
 # plt.figure()
