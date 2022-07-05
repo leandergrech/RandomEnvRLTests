@@ -40,7 +40,7 @@ def argmax(arr):
 
 
 class QValueFunctionTiles3:
-    def __init__(self, tilings: Tilings, actions: list, lr: Generator[float, None, None]):
+    def __init__(self, tilings: Tilings, actions: list):#, lr: Generator[float, None, None]):
         """
         param tilings: Tiling instance
         param actions: List of all possible discrete actions
@@ -48,8 +48,8 @@ class QValueFunctionTiles3:
         """
         self.tilings = tilings
         self.actions = actions
-        self.lr = lambda: next(lr) / len(tilings)
-        self.q_table = [-1.] * tilings.max_tiles
+        # self.lr = lambda: next(lr) / len(tilings)
+        self.q_table = [-1. for _ in range(tilings.max_tiles)]
 
         self.nb_updates = 0
 
@@ -63,16 +63,17 @@ class QValueFunctionTiles3:
         estimate = 0.
         for coding in codings:
             estimate += self.q_table[coding]
-        return estimate
+        return estimate / len(self.tilings)
 
-    def update(self, state, action, target):
+    def update(self, state, action, target, lr):
         self.nb_updates += 1
 
         action_idx = self.get_action_value(action)
         codings = self.tilings.get_tiling_indices(features=state,
                                                   ints=[action_idx])
         error = target - self.value(state, action)
-        alpha = self.lr()
+        # alpha = self.lr()/len(self.tilings)
+        alpha = lr / len(self.tilings)
         for coding in codings:
             self.q_table[coding] += alpha * error
         return error
