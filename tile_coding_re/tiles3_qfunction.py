@@ -49,7 +49,8 @@ class QValueFunctionTiles3:
         self.tilings = tilings
         self.actions = actions
         # self.lr = lambda: next(lr) / len(tilings)
-        self.q_table = [-1. for _ in range(tilings.max_tiles)]
+        init_q_val = -1.0
+        self.q_table = [init_q_val for _ in range(tilings.max_tiles)]
 
         self.nb_updates = 0
 
@@ -73,7 +74,8 @@ class QValueFunctionTiles3:
                                                   ints=[action_idx])
         error = target - self.value(state, action)
         # alpha = self.lr()/len(self.tilings)
-        alpha = lr / len(self.tilings)
+        # alpha = lr / len(self.tilings)
+        alpha = lr
         for coding in codings:
             self.q_table[coding] += alpha * error
         return error

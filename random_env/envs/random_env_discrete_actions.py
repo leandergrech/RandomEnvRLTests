@@ -4,8 +4,8 @@ import numpy as np
 from random_env.envs import RandomEnv
 
 
-def get_discrete_actions(n_act):
-    all_actions = [list(item) for item in product(*np.repeat([[0, 1, 2]], n_act, axis=0))]
+def get_discrete_actions(n_act, act_dim=3):
+    all_actions = [list(item) for item in product(*np.repeat([[item for item in range(act_dim)]], n_act, axis=0))]
     return all_actions
 
 
