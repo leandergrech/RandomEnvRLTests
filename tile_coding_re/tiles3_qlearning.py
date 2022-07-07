@@ -45,8 +45,8 @@ nb_tilings = 8
 nb_bins = 2
 
 # Training info
-nb_eps = 150
-nb_runs = 2
+nb_eps = 200
+nb_runs = 5
 
 # Hyper parameters
 # # Linear decaying lr
@@ -65,14 +65,14 @@ nb_runs = 2
 
 # Step-wise decaying lr
 init_lr = 1.5e-1
-lr_decay_rate = 0.5
+lr_decay_rate = 0.9
 lr_decay_every_eps = 15#int(nb_eps/10)
 lr_fun = lambda ep_i: init_lr * lr_decay_rate**(ep_i//lr_decay_every_eps)
 lr_str = f'Step decay LR: {init_lr}x{lr_decay_rate}^(ep_idx//{lr_decay_every_eps})'
 
 # Step-wise decaying exploration
 init_exploration = 1.0
-exploration_decay_rate = 0.5
+exploration_decay_rate = 0.3
 exploration_decay_every_eps = 15#int(nb_eps/10)
 exploration_fun = lambda ep_i: init_exploration * exploration_decay_rate**(ep_i//exploration_decay_every_eps)
 exploration_str = f'Step decay LR: {init_exploration}x{exploration_decay_rate}^(ep_idx//{exploration_decay_every_eps})'

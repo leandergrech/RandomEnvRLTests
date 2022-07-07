@@ -3,7 +3,7 @@ from itertools import product
 import numpy as np
 from pandas import Series
 import matplotlib.pyplot as plt
-from tqdm import trange
+from tqdm import trange, tqdm as pbar
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
 from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
 from tile_coding_re.heatmap_utils import make_heatmap, update_heatmap
@@ -39,7 +39,7 @@ hparams['nb_tilings'] = nb_tilings = 8
 hparams['nb_bins'] = nb_bins = 2
 
 # Training info
-hparams['nb_eps'] = nb_eps = 10
+hparams['nb_eps'] = nb_eps = 100
 hparams['nb_runs'] = nb_runs = 2
 
 # Hyper parameters
@@ -63,8 +63,11 @@ hparams['lr_decay_every_eps'] = lr_decay_every_eps = 15  # int(nb_eps/10)
 hparams['init_exploration'] = init_exploration = 1.0
 hparams['exploration_decay_every_eps'] = exploration_decay_every_eps = 15  # int(nb_eps/10)
 
-lr_decay_rate_list = np.arange(0.1, 1.0, 0.8)
-exploration_decay_rate_list = np.arange(0.1, 1.0, 0.8)
+lr_decay_rate_list = np.arange(0.1, 1.0, 0.2)
+exploration_decay_rate_list = np.arange(0.1, 1.0, 0.2)
+
+max_nb_perms = len(lr_decay_rate_list) * len(exploration_decay_rate_list)
+progress = pbar(total=max_nb_perms*nb_eps*nb_runs)
 
 def train(lr_decay_rate, exploration_decay_rate):
     hparams['lr_decay_rate'] = lr_decay_rate
@@ -92,7 +95,6 @@ def train(lr_decay_rate, exploration_decay_rate):
     def get_qvals(state, q):
         return [q.value(state, a_) for a_ in actions]
 
-
     def get_total_greedy_action(state, q1, q2):
         val1 = get_qvals(state, q1)
         val2 = get_qvals(state, q2)
@@ -104,7 +106,7 @@ def train(lr_decay_rate, exploration_decay_rate):
     # Start training
     returns = np.zeros((nb_runs, nb_eps), dtype=float)
     errors = np.zeros((nb_runs, nb_eps), dtype=float)
-    for run in trange(nb_runs):
+    for run in range(nb_runs):
         tilings = Tilings(nb_tilings, nb_bins, ranges, max_tiles)
         q1 = QValueFunctionTiles3(tilings, actions)
         q2 = QValueFunctionTiles3(tilings, actions)
@@ -134,6 +136,7 @@ def train(lr_decay_rate, exploration_decay_rate):
                 o = otp1
                 ep_step += 1
             errors[run, ep] /= ep_step
+            progress.update(1)
 
     return returns, errors
 
@@ -147,17 +150,51 @@ def execute_grid():
         with open(os.path.join(experiment_path, f'permutation_{i}.pkl'), 'wb') as f:
             pkl.dump(results, f)
 
-
+from collections import deque
 def eval_plot():
     file_paths = []
-    for file in os.listdir(experiment_path):
-        file_paths.append(os.path.join(experiment_path, file))
+    data_dict = {}
+    nb_best = 5
+    best_plots = deque(maxlen=nb_best)
+    for i, file in enumerate(os.listdir(experiment_path)):
+        fp = os.path.join(experiment_path, file)
+        file_paths.append(fp)
+        with open(fp, 'rb') as f:
+            dat = pkl.load(f)
+            mean_returns = np.mean(dat['returns'], axis=0)
+            mean_returns = Series(mean_returns).rolling(20).mean().to_numpy()
 
-    for file in file_paths:
-        
+            hp = dat['hparams']
+            i = hp['iteration']
+            lr_decay = hp['lr_decay_rate']
+            exp_decay = hp['exploration_decay_rate']
+
+            key = (i, lr_decay, exp_decay)
+            data_dict[key] = mean_returns
+
+            max_val = np.nanmax(mean_returns)
+            if len(best_plots) < nb_best:
+                best_plots.append((max_val, i))
+            elif np.nanmin([item[0] for item in best_plots]) < max_val:
+                j = np.argmin([item[0] for item in best_plots])
+                best_plots[j] = (max_val, i)
+
+    fig, ax = plt.subplots()
+    for label, dat in data_dict.items():
+        if label[0] in [item[1] for item in best_plots]:
+            actual_label = f'It#{label[0]},LR={label[1]:.2f},EXP={label[2]:.2f}'
+        else:
+            actual_label = None
+        ax.plot(dat, label=actual_label)
+
+    ax.legend(loc='upper left')
+    plt.show()
+
+
 
 
 if __name__ == '__main__':
     # execute_grid()
+    # progress.close()
     eval_plot()
 
