@@ -29,7 +29,7 @@ actions = [item[0] for item in get_discrete_actions(n_act)]
 # Hyper parameters
 # lr = lr(1e-1, 30000)
 init_lr = 1e-1
-final_lr = 1e-3
+final_lr = 1e-1
 lr_decay_eps = 1000
 lr_fun = lambda ep_i: final_lr + (init_lr - final_lr) * max(0, (1 - ep_i/lr_decay_eps))
 init_exploration = 1.0

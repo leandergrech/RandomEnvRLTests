@@ -45,25 +45,44 @@ nb_tilings = 8
 nb_bins = 2
 
 # Training info
-nb_eps = 1200
-nb_runs = 10
+nb_eps = 150
+nb_runs = 2
 
 # Hyper parameters
+# # Linear decaying lr
+# init_lr = 1e-1
+# final_lr = 1e-2
+# lr_decay_eps = 1000
+# lr_fun = lambda ep_i: final_lr + (init_lr - final_lr) * max(0, (1 - ep_i/lr_decay_eps))
+# lr_str = f'Linear decay LR:  {init_lr:.2}->{final_lr} in {lr_decay_eps} episodes'
+
+# Linear decaying exploration
+# init_exploration = 1.
+# final_exploration = 0.0
+# exploration_decay_eps = 100
+# exploration_fun =  lambda ep_i: final_exploration + (init_exploration - final_exploration) * max(0, (1. - ep_i/exploration_decay_eps))
+# exploration_str = f'Linear decay EPS: {init_exploration}->{final_exploration} in {exploration_decay_eps} episodes'
+
+# Step-wise decaying lr
 init_lr = 1.5e-1
-final_lr = 1e-2
-lr_decay_eps = 1200
-lr_fun = lambda ep_i: final_lr + (init_lr - final_lr) * max(0, (1 - ep_i/lr_decay_eps))
-init_exploration = 1.
-final_exploration = 0.0
-exploration_decay_eps = 1100
-exploration_fun =  lambda ep_i: final_exploration + (init_exploration - final_exploration) * max(0, (1. - ep_i/exploration_decay_eps))
+lr_decay_rate = 0.5
+lr_decay_every_eps = 15#int(nb_eps/10)
+lr_fun = lambda ep_i: init_lr * lr_decay_rate**(ep_i//lr_decay_every_eps)
+lr_str = f'Step decay LR: {init_lr}x{lr_decay_rate}^(ep_idx//{lr_decay_every_eps})'
+
+# Step-wise decaying exploration
+init_exploration = 1.0
+exploration_decay_rate = 0.5
+exploration_decay_every_eps = 15#int(nb_eps/10)
+exploration_fun = lambda ep_i: init_exploration * exploration_decay_rate**(ep_i//exploration_decay_every_eps)
+exploration_str = f'Step decay LR: {init_exploration}x{exploration_decay_rate}^(ep_idx//{exploration_decay_every_eps})'
+
 gamma = 0.99
 
 suptitle_suffix = f'Tilings: {nb_tilings} - Bins: {nb_bins}\n' \
                   f'Gamma: {gamma}\n' \
-                  f'Linear decay LR:  {init_lr:.2}->{final_lr} in {lr_decay_eps} episodes\n' \
-                  f'Linear decay EPS: {init_exploration}->{final_exploration} in {exploration_decay_eps} episodes'
-
+                  f'{lr_str}\n' \
+                  f'{exploration_str}'
 
 
 save_name = f'{env_name}_{nb_runs}Runs_{nb_eps}eps_{nb_tilings}Tilings_{nb_bins}Bins_1'
@@ -141,15 +160,24 @@ def eval_plot():
 
     nb_runs, nb_eps = returns.shape
 
-    gs_kw = dict(width_ratios=[1],height_ratios=[2,1])
-    fig, axd = plt.subplot_mosaic([['returns'],
-                                   ['errors']],
+    gs_kw = dict(width_ratios=[3, 1],height_ratios=[2, 1])
+    fig, axd = plt.subplot_mosaic([['returns', 'returns'],
+                                   ['errors', 'others']],
                                   gridspec_kw=gs_kw, figsize=(10, 7))
     fig.suptitle(f'{env_name} - {nb_runs} Runs\n{suptitle_suffix}')
     ax_rets = axd['returns']
     ax_rets.set_ylabel('Total rewards')
     ax_err = axd['errors']
     ax_err.set_ylabel('Average TD error')
+
+    ax_lr = axd['others']
+    ax_lr.set_ylabel('Learning rate')
+    ax_exp = ax_lr.twinx()
+    ax_exp.set_ylabel('Exploration rate')
+
+    ax_lr.plot([lr_fun(i) for i in range(nb_eps)], c='b')
+    ax_exp.plot([exploration_fun(i) for i in range(nb_eps)], c='r')
+    ax_lr.legend(handles=(plt.Line2D([], [], c='b'), plt.Line2D([],[],c='r')), labels=('LR', 'EXP'), loc='best')
 
     ax_err.axhline(0.0, c='k')
     fig.tight_layout()
