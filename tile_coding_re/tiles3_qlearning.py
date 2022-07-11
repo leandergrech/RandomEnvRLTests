@@ -45,8 +45,8 @@ nb_tilings = 8
 nb_bins = 2
 
 # Training info
-nb_eps = 200
-nb_runs = 5
+nb_eps = 250
+nb_runs = 20
 
 # Hyper parameters
 # # Linear decaying lr
@@ -65,17 +65,17 @@ nb_runs = 5
 
 # Step-wise decaying lr
 init_lr = 1.5e-1
-lr_decay_rate = 0.9
+lr_decay_rate = 0.1
 lr_decay_every_eps = 15#int(nb_eps/10)
 lr_fun = lambda ep_i: init_lr * lr_decay_rate**(ep_i//lr_decay_every_eps)
 lr_str = f'Step decay LR: {init_lr}x{lr_decay_rate}^(ep_idx//{lr_decay_every_eps})'
 
 # Step-wise decaying exploration
 init_exploration = 1.0
-exploration_decay_rate = 0.3
+exploration_decay_rate = 0.5
 exploration_decay_every_eps = 15#int(nb_eps/10)
 exploration_fun = lambda ep_i: init_exploration * exploration_decay_rate**(ep_i//exploration_decay_every_eps)
-exploration_str = f'Step decay LR: {init_exploration}x{exploration_decay_rate}^(ep_idx//{exploration_decay_every_eps})'
+exploration_str = f'Step decay EXP: {init_exploration}x{exploration_decay_rate}^(ep_idx//{exploration_decay_every_eps})'
 
 gamma = 0.99
 
@@ -84,8 +84,11 @@ suptitle_suffix = f'Tilings: {nb_tilings} - Bins: {nb_bins}\n' \
                   f'{lr_str}\n' \
                   f'{exploration_str}'
 
-
-save_name = f'{env_name}_{nb_runs}Runs_{nb_eps}eps_{nb_tilings}Tilings_{nb_bins}Bins_1'
+par_dir = 'double_q_learning'
+save_dir = os.path.join(par_dir, 'saved_arrays')
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
+save_name = f'{env_name}_{nb_runs}Runs_{nb_eps}eps_{nb_tilings}Tilings_{nb_bins}Bins_3'
 
 def train():
     ranges = [[l, h] for l, h in zip(env_lows, env_highs)]
@@ -148,15 +151,15 @@ def train():
                 ep_step += 1
             errors[run, ep] /= ep_step
 
-    np.save(os.path.join('results', 'saved_arrays', f'{save_name}_returns.npy'), returns)
-    np.save(os.path.join('results', 'saved_arrays', f'{save_name}_errors.npy'), errors)
+    np.save(os.path.join(save_dir, f'{save_name}_returns.npy'), returns)
+    np.save(os.path.join(save_dir, f'{save_name}_errors.npy'), errors)
 
 
 def eval_plot():
     file_prefix = save_name
 
-    returns = np.load(os.path.join('results', 'saved_arrays', f'{file_prefix}_returns.npy'))
-    errors = np.load(os.path.join('results', 'saved_arrays', f'{file_prefix}_errors.npy'))
+    returns = np.load(os.path.join(save_dir, f'{file_prefix}_returns.npy'))
+    errors = np.load(os.path.join(save_dir, f'{file_prefix}_errors.npy'))
 
     nb_runs, nb_eps = returns.shape
 
@@ -180,12 +183,11 @@ def eval_plot():
     ax_lr.legend(handles=(plt.Line2D([], [], c='b'), plt.Line2D([],[],c='r')), labels=('LR', 'EXP'), loc='best')
 
     ax_err.axhline(0.0, c='k')
-    fig.tight_layout()
 
     for dat, ax in zip((returns, errors), (ax_rets, ax_err)):
         quants = np.quantile(dat, [0.0, 0.25, 0.5, 0.75, 1.0], axis=0)
 
-        averaging_window = 20
+        averaging_window = 10
         for i, q in enumerate(quants):
             quants[i] = Series(q).rolling(averaging_window).mean().to_numpy()
 
@@ -202,9 +204,10 @@ def eval_plot():
 
         ax.set_xlabel('Training episodes')
 
-        plt.legend(loc='upper left')
+        ax.legend(loc='upper left')
 
-    plt.savefig(os.path.join('results', f'{file_prefix}.png'))
+    fig.tight_layout()
+    plt.savefig(os.path.join(par_dir, f'{file_prefix}.png'))
 
     plt.show()
 

@@ -1,6 +1,7 @@
 import os
 from itertools import product
 import numpy as np
+from collections import deque
 from pandas import Series
 import matplotlib.pyplot as plt
 from tqdm import trange, tqdm as pbar
@@ -12,25 +13,44 @@ import gym
 import pickle as pkl
 from datetime import datetime as dt
 
-par_dir = 'gridsearches'
-experiment_name = 'decaying-rates-sweep-of-lr-and-exp'
-experiment_path = os.path.join(par_dir, experiment_name)
-if not os.path.exists(experiment_path):
-    os.makedirs(experiment_path)
+'''
+Name of RL method used to train agent
+'''
+method_name = 'TD Double Q-Learning with tile-coding'
 
+'''
+hparams holds all the hyperparameters used in each respective iteration of the gridsearch
+'''
 hparams = {}
 
-hparams['env_name'] = env_name = 'MountainCar-v0'
+'''
+Choose environment and set state limits accordingly
+'''
+# hparams['env_name'] = env_name = 'MountainCar-v0'
+# env = gym.make(env_name)
+# env_lows, env_highs = env.observation_space.low, env.observation_space.high
+
+hparams['env_name'] = env_name = 'CartPole-v1'
 env = gym.make(env_name)
-env_lows, env_highs = env.observation_space.low, env.observation_space.high
+env_highs = [2.4, 3, 0.2095, 3]
+env_lows = [-item for item in env_highs]
+
 hparams['env_lows'] = env_lows
 hparams['env_highs'] = env_highs
 
-# env_name = 'CartPole-v1'
-# env = gym.make(env_name)
-# env_highs = [2.4, 3, 0.2095, 3]
-# env_lows = [-item for item in env_highs]
 
+'''
+Initialise the save directory
+'''
+par_dir = 'gridsearches'
+gridsearch_name = 'decaying-rates-sweep-of-lr-and-exp'
+experiment_path = os.path.join(par_dir, gridsearch_name, env_name)
+if not os.path.exists(experiment_path):
+    os.makedirs(experiment_path)
+
+'''
+Set all constant parameters throughout the experiment
+'''
 n_obs = env.observation_space.shape[0]
 n_act = 1
 
@@ -39,8 +59,8 @@ hparams['nb_tilings'] = nb_tilings = 8
 hparams['nb_bins'] = nb_bins = 2
 
 # Training info
-hparams['nb_eps'] = nb_eps = 100
-hparams['nb_runs'] = nb_runs = 2
+hparams['nb_eps'] = nb_eps = 1000
+hparams['nb_runs'] = nb_runs = 5
 
 # Hyper parameters
 # # Linear decaying lr
@@ -63,27 +83,37 @@ hparams['lr_decay_every_eps'] = lr_decay_every_eps = 15  # int(nb_eps/10)
 hparams['init_exploration'] = init_exploration = 1.0
 hparams['exploration_decay_every_eps'] = exploration_decay_every_eps = 15  # int(nb_eps/10)
 
+'''
+Both LR and EXP are tested for the values of [0.1, 0.3, ..., 0.7, 0.9] respectively
+'''
 lr_decay_rate_list = np.arange(0.1, 1.0, 0.2)
 exploration_decay_rate_list = np.arange(0.1, 1.0, 0.2)
+# Step-wise decaying lr
+lr_fun = lambda ep_i, decay_rate: init_lr * decay_rate ** (ep_i // lr_decay_every_eps)
+lr_fun_str = f'{init_lr} x LR_DECAY^(ep_index//{lr_decay_every_eps})'
+# Step-wise decaying exploration
+exploration_fun = lambda ep_i, decay_rate: init_exploration * decay_rate ** (ep_i // exploration_decay_every_eps)
+exploration_fun_str = f'{init_exploration} x EXP_DECAY^(ep_index//{exploration_decay_every_eps})'
 
 max_nb_perms = len(lr_decay_rate_list) * len(exploration_decay_rate_list)
-progress = pbar(total=max_nb_perms*nb_eps*nb_runs)
+progress = None
+
 
 def train(lr_decay_rate, exploration_decay_rate):
+    global progress
+
+    '''
+    Set the changing hyperparameters
+    '''
     hparams['lr_decay_rate'] = lr_decay_rate
     hparams['exploration_decay_rate'] = exploration_decay_rate
-
-    # Step-wise decaying lr
-    lr_fun = lambda ep_i: init_lr * lr_decay_rate ** (ep_i // lr_decay_every_eps)
-
-    # Step-wise decaying exploration
-    exploration_fun = lambda ep_i: init_exploration * exploration_decay_rate ** (ep_i // exploration_decay_every_eps)
 
     ranges = [[l, h] for l, h in zip(env_lows, env_highs)]
 
     act_dim = env.action_space.n
     max_tiles = 2 ** 20
 
+    # List of all possible discrete actions
     actions = [item[0] for item in get_discrete_actions(n_act, act_dim)]
 
     def swap_q(q1, q2):
@@ -116,7 +146,7 @@ def train(lr_decay_rate, exploration_decay_rate):
             d = False
             ep_step = 0
             while not d:
-                exploration = exploration_fun(ep)
+                exploration = exploration_fun(ep, exploration_decay_rate)
                 if np.random.rand() < exploration:
                     a = env.action_space.sample()
                 else:
@@ -129,7 +159,7 @@ def train(lr_decay_rate, exploration_decay_rate):
                 qvfa, qvfb = swap_q(q1, q2)
                 target = r + gamma * qvfb.value(otp1, qvfa.greedy_action(otp1))
 
-                lr = lr_fun(ep)
+                lr = lr_fun(ep, lr_decay_rate)
                 error = qvfa.update(o, a, target, lr)
                 errors[run, ep] += error
 
@@ -141,28 +171,34 @@ def train(lr_decay_rate, exploration_decay_rate):
     return returns, errors
 
 def execute_grid():
+    global progress
+    # Set up grid of parameters to test
     permutation_test_params = [item for item in product(lr_decay_rate_list, exploration_decay_rate_list)]
+    progress = pbar(total=max_nb_perms*nb_eps*nb_runs)
     for i, perm in enumerate(permutation_test_params):
         hparams['iteration'] = i
         returns, errors = train(*perm)
 
-        results = dict(hparams=hparams, returns=returns, errors=errors)
+        param_result_set = dict(hparams=hparams, returns=returns, errors=errors)
         with open(os.path.join(experiment_path, f'permutation_{i}.pkl'), 'wb') as f:
-            pkl.dump(results, f)
+            pkl.dump(param_result_set, f)
+    progress.close()
 
-from collections import deque
+
 def eval_plot():
     file_paths = []
     data_dict = {}
-    nb_best = 5
+    nb_best = 3
+    nb_worst = 3
     best_plots = deque(maxlen=nb_best)
+    worst_plots = deque(maxlen=nb_worst)
     for i, file in enumerate(os.listdir(experiment_path)):
         fp = os.path.join(experiment_path, file)
         file_paths.append(fp)
         with open(fp, 'rb') as f:
             dat = pkl.load(f)
             mean_returns = np.mean(dat['returns'], axis=0)
-            mean_returns = Series(mean_returns).rolling(20).mean().to_numpy()
+            mean_returns_smooth = Series(mean_returns).rolling(20).mean().to_numpy()
 
             hp = dat['hparams']
             i = hp['iteration']
@@ -170,23 +206,42 @@ def eval_plot():
             exp_decay = hp['exploration_decay_rate']
 
             key = (i, lr_decay, exp_decay)
-            data_dict[key] = mean_returns
+            # data_dict[key] = mean_returns
+            data_dict[key] = mean_returns_smooth
 
-            max_val = np.nanmax(mean_returns)
+            max_val = np.nanmax(mean_returns_smooth)
+            # max_val = sum(mean_returns)
             if len(best_plots) < nb_best:
                 best_plots.append((max_val, i))
             elif np.nanmin([item[0] for item in best_plots]) < max_val:
                 j = np.argmin([item[0] for item in best_plots])
                 best_plots[j] = (max_val, i)
 
-    fig, ax = plt.subplots()
+            if len(worst_plots) < nb_worst:
+                worst_plots.append((max_val, i))
+            elif np.nanmax([item[0] for item in worst_plots]) >= max_val:
+                j = np.argmax([item[0] for item in worst_plots])
+                worst_plots[j] = (max_val, i)
+
+    fig, ax = plt.subplots(figsize=(12, 8))
+    fig.suptitle(f'Environment: {env_name}\nMethod: {method_name}\nGAMMA={gamma}, NB_TILINGS={nb_tilings}, NB_BINS={nb_bins}\nLR function: {lr_fun_str}\nEXP function: {exploration_fun_str}\n'
+                 f'LR_DECAY={lr_decay_rate_list}\nEXP_DECAY={exploration_decay_rate_list}')
+    ax.set_xlabel('Training episodes')
+    ax.set_ylabel('Total reward per episode')
     for label, dat in data_dict.items():
+        ls = 'solid'
         if label[0] in [item[1] for item in best_plots]:
-            actual_label = f'It#{label[0]},LR={label[1]:.2f},EXP={label[2]:.2f}'
+            actual_label = f'It#{label[0]},LR_DECAY={label[1]:.2f},EXP_DECAY={label[2]:.2f}'
+            lw = 2
+        elif label[0] in [item[1] for item in worst_plots]:
+            actual_label = f'It#{label[0]},LR_DECAY={label[1]:.2f},EXP_DECAY={label[2]:.2f}'
+            lw = 2
+            ls = 'dashed'
         else:
             actual_label = None
-        ax.plot(dat, label=actual_label)
-
+            lw = 0.5
+        ax.plot(dat, lw=lw, ls=ls, label=actual_label)
+    fig.tight_layout()
     ax.legend(loc='upper left')
     plt.show()
 
