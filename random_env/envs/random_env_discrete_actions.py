@@ -6,6 +6,8 @@ from random_env.envs import RandomEnv
 
 def get_discrete_actions(n_act, act_dim=3):
     all_actions = [list(item) for item in product(*np.repeat([[item for item in range(act_dim)]], n_act, axis=0))]
+    if n_act == 1:
+        all_actions = [item[0] for item in all_actions]
     return all_actions
 
 

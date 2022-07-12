@@ -26,15 +26,29 @@ hparams = {}
 '''
 Choose environment and set state limits accordingly
 '''
-# hparams['env_name'] = env_name = 'MountainCar-v0'
+# env_name = 'MountainCar-v0'
 # env = gym.make(env_name)
 # env_lows, env_highs = env.observation_space.low, env.observation_space.high
+# n_obs = env.observation_space.shape[0]
+# n_act = 1
+# act_dim = 3
 
-hparams['env_name'] = env_name = 'CartPole-v1'
-env = gym.make(env_name)
-env_highs = [2.4, 3, 0.2095, 3]
-env_lows = [-item for item in env_highs]
+# env_name = 'CartPole-v1'
+# env = gym.make(env_name)
+# env_highs = [2.4, 3, 0.2095, 3]
+# env_lows = [-item for item in env_highs]
+# n_obs = env.observation_space.shape[0]
+# n_act = 1
+# act_dim = 2
 
+n_obs = n_act = 2
+env = REDA(n_obs, n_act)
+env_name = repr(env)
+env_lows, env_highs = env.observation_space.low, env.observation_space.high
+act_dim = 3
+
+
+hparams['env_name'] = env_name
 hparams['env_lows'] = env_lows
 hparams['env_highs'] = env_highs
 
@@ -44,39 +58,25 @@ Initialise the save directory
 '''
 par_dir = 'gridsearches'
 gridsearch_name = 'decaying-rates-sweep-of-lr-and-exp'
-experiment_path = os.path.join(par_dir, gridsearch_name, env_name)
+experiment_name = f'{env_name}_coarse'
+
+experiment_path = os.path.join(par_dir, gridsearch_name, experiment_name)
 if not os.path.exists(experiment_path):
     os.makedirs(experiment_path)
 
 '''
 Set all constant parameters throughout the experiment
 '''
-n_obs = env.observation_space.shape[0]
-n_act = 1
 
 # Tiling info
 hparams['nb_tilings'] = nb_tilings = 8
 hparams['nb_bins'] = nb_bins = 2
 
 # Training info
-hparams['nb_eps'] = nb_eps = 1000
+hparams['nb_eps'] = nb_eps = 500
 hparams['nb_runs'] = nb_runs = 5
 
 # Hyper parameters
-# # Linear decaying lr
-# init_lr = 1e-1
-# final_lr = 1e-2
-# lr_decay_eps = 1000
-# lr_fun = lambda ep_i: final_lr + (init_lr - final_lr) * max(0, (1 - ep_i/lr_decay_eps))
-# lr_str = f'Linear decay LR:  {init_lr:.2}->{final_lr} in {lr_decay_eps} episodes'
-
-# Linear decaying exploration
-# init_exploration = 1.
-# final_exploration = 0.0
-# exploration_decay_eps = 100
-# exploration_fun =  lambda ep_i: final_exploration + (init_exploration - final_exploration) * max(0, (1. - ep_i/exploration_decay_eps))
-# exploration_str = f'Linear decay EPS: {init_exploration}->{final_exploration} in {exploration_decay_eps} episodes'
-
 hparams['gamma'] = gamma = 0.99
 hparams['init_lr'] = init_lr = 1.5e-1
 hparams['lr_decay_every_eps'] = lr_decay_every_eps = 15  # int(nb_eps/10)
@@ -86,8 +86,13 @@ hparams['exploration_decay_every_eps'] = exploration_decay_every_eps = 15  # int
 '''
 Both LR and EXP are tested for the values of [0.1, 0.3, ..., 0.7, 0.9] respectively
 '''
+# Coarse tuning
 lr_decay_rate_list = np.arange(0.1, 1.0, 0.2)
 exploration_decay_rate_list = np.arange(0.1, 1.0, 0.2)
+# Fine tuning
+# lr_decay_rate_list = np.arange(0.8, 1.0, 0.05).tolist() + [0.99]
+# exploration_decay_rate_list = np.arange(0.8, 1.0, 0.05).tolist() + [0.99]
+
 # Step-wise decaying lr
 lr_fun = lambda ep_i, decay_rate: init_lr * decay_rate ** (ep_i // lr_decay_every_eps)
 lr_fun_str = f'{init_lr} x LR_DECAY^(ep_index//{lr_decay_every_eps})'
@@ -110,11 +115,10 @@ def train(lr_decay_rate, exploration_decay_rate):
 
     ranges = [[l, h] for l, h in zip(env_lows, env_highs)]
 
-    act_dim = env.action_space.n
     max_tiles = 2 ** 20
 
     # List of all possible discrete actions
-    actions = [item[0] for item in get_discrete_actions(n_act, act_dim)]
+    actions = get_discrete_actions(n_act, act_dim)
 
     def swap_q(q1, q2):
         if np.random.rand() < 0.5:
@@ -148,7 +152,7 @@ def train(lr_decay_rate, exploration_decay_rate):
             while not d:
                 exploration = exploration_fun(ep, exploration_decay_rate)
                 if np.random.rand() < exploration:
-                    a = env.action_space.sample()
+                    a = env.action_space.sample().tolist()
                 else:
                     a = get_total_greedy_action(o, q1, q2)
 
@@ -169,6 +173,7 @@ def train(lr_decay_rate, exploration_decay_rate):
             progress.update(1)
 
     return returns, errors
+
 
 def execute_grid():
     global progress
@@ -198,7 +203,7 @@ def eval_plot():
         with open(fp, 'rb') as f:
             dat = pkl.load(f)
             mean_returns = np.mean(dat['returns'], axis=0)
-            mean_returns_smooth = Series(mean_returns).rolling(20).mean().to_numpy()
+            mean_returns_smooth = Series(mean_returns).rolling(5).mean().to_numpy()
 
             hp = dat['hparams']
             i = hp['iteration']
@@ -208,6 +213,7 @@ def eval_plot():
             key = (i, lr_decay, exp_decay)
             # data_dict[key] = mean_returns
             data_dict[key] = mean_returns_smooth
+            # data_dict[key] = mean_returns
 
             max_val = np.nanmax(mean_returns_smooth)
             # max_val = sum(mean_returns)
@@ -246,10 +252,7 @@ def eval_plot():
     plt.show()
 
 
-
-
 if __name__ == '__main__':
-    # execute_grid()
-    # progress.close()
+    execute_grid()
     eval_plot()
 

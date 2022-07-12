@@ -10,14 +10,14 @@ from tile_coding_re.heatmap_utils import make_heatmap, update_heatmap
 from tile_coding_re.buffers import TrajBuffer
 import gym
 
-env_name = 'MountainCar-v0'
-env = gym.make(env_name)
-env_lows, env_highs = env.observation_space.low, env.observation_space.high
-
-# env_name = 'CartPole-v1'
+# env_name = 'MountainCar-v0'
 # env = gym.make(env_name)
-# env_highs = [2.4, 3, 0.2095, 3]
-# env_lows = [-item for item in env_highs]
+# env_lows, env_highs = env.observation_space.low, env.observation_space.high
+
+env_name = 'CartPole-v1'
+env = gym.make(env_name)
+env_highs = [2.4, 3, 0.2095, 3]
+env_lows = [-item for item in env_highs]
 
 n_obs = env.observation_space.shape[0]
 n_act = 1
@@ -45,7 +45,7 @@ nb_tilings = 8
 nb_bins = 2
 
 # Training info
-nb_eps = 250
+nb_eps = 1000
 nb_runs = 20
 
 # Hyper parameters
@@ -65,14 +65,14 @@ nb_runs = 20
 
 # Step-wise decaying lr
 init_lr = 1.5e-1
-lr_decay_rate = 0.1
+lr_decay_rate = 0.99
 lr_decay_every_eps = 15#int(nb_eps/10)
 lr_fun = lambda ep_i: init_lr * lr_decay_rate**(ep_i//lr_decay_every_eps)
 lr_str = f'Step decay LR: {init_lr}x{lr_decay_rate}^(ep_idx//{lr_decay_every_eps})'
 
 # Step-wise decaying exploration
 init_exploration = 1.0
-exploration_decay_rate = 0.5
+exploration_decay_rate = 0.85
 exploration_decay_every_eps = 15#int(nb_eps/10)
 exploration_fun = lambda ep_i: init_exploration * exploration_decay_rate**(ep_i//exploration_decay_every_eps)
 exploration_str = f'Step decay EXP: {init_exploration}x{exploration_decay_rate}^(ep_idx//{exploration_decay_every_eps})'
@@ -88,7 +88,7 @@ par_dir = 'double_q_learning'
 save_dir = os.path.join(par_dir, 'saved_arrays')
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
-save_name = f'{env_name}_{nb_runs}Runs_{nb_eps}eps_{nb_tilings}Tilings_{nb_bins}Bins_3'
+save_name = f'{env_name}_{nb_runs}Runs_{nb_eps}eps_{nb_tilings}Tilings_{nb_bins}Bins_1'
 
 def train():
     ranges = [[l, h] for l, h in zip(env_lows, env_highs)]
@@ -151,15 +151,15 @@ def train():
                 ep_step += 1
             errors[run, ep] /= ep_step
 
-    np.save(os.path.join(save_dir, f'{save_name}_returns.npy'), returns)
-    np.save(os.path.join(save_dir, f'{save_name}_errors.npy'), errors)
+    np.savez(os.path.join(save_dir, f'{save_name}.npz'), returns=returns, errors=errors)
 
 
 def eval_plot():
     file_prefix = save_name
 
-    returns = np.load(os.path.join(save_dir, f'{file_prefix}_returns.npy'))
-    errors = np.load(os.path.join(save_dir, f'{file_prefix}_errors.npy'))
+    npz_file = np.load(os.path.join(save_dir, f'{file_prefix}.npz'))
+    returns = npz_file['returns']
+    errors = npz_file['errors']
 
     nb_runs, nb_eps = returns.shape
 
@@ -200,7 +200,9 @@ def eval_plot():
         ax.fill_between(xrange, dat75, dat100, color='none', edgecolor='b', hatch='//')
 
         # for datum in dat:
-        #     ax.plot(xrange, Series(datum).rolling(averaging_window).mean().to_numpy())
+        #     if np.nanmax(dat) == 500.:
+        #         ax.plot(xrange, Series(datum).rolling(averaging_window).mean().to_numpy(), label='Sample run')
+        #         break
 
         ax.set_xlabel('Training episodes')
 
