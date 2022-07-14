@@ -1,7 +1,7 @@
 import numpy as np
 from itertools import cycle
 import matplotlib.pyplot as plt
-from tile_coding_re.tile_coding import get_tilings_from_env, QValueFunction, get_tile_coding
+from tile_coding_re.indirect_approach.tile_coding import get_tilings_from_env, QValueFunction, get_tile_coding
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
 
 nb_tilings = 4

@@ -8,11 +8,11 @@ import matplotlib.ticker as mpltick
 from humanize import naturalsize
 
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
-from tile_coding_re.tile_coding import QValueFunction2, get_tilings_from_env
+from tile_coding_re.indirect_approach.tile_coding import QValueFunction2, get_tilings_from_env
 
 
 def check_constants_py_args():
-    from tile_coding_re.mc_method.constants import N_OBS, N_ACT, NB_TILINGS, NB_BINS, LR
+    from tile_coding_re.indirect_approach.mc_method.constants import N_OBS, N_ACT, NB_TILINGS, NB_BINS, LR
     env = RandomEnvDiscreteActions(n_obs=N_OBS, n_act=N_ACT)
     tilings = get_tilings_from_env(env, NB_TILINGS, NB_BINS)
     actions = get_discrete_actions(N_ACT)

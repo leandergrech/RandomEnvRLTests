@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
-from tile_coding_re.sarsa.tile_coding import get_tilings_from_env, QValueFunction
-from tile_coding_re.sarsa.utils import TrajBuffer
-from tile_coding_re.sarsa.constants import *
+from tile_coding_re.indirect_approach.sarsa import get_tilings_from_env, QValueFunction
+from tile_coding_re.indirect_approach.sarsa import TrajBuffer
+from tile_coding_re.indirect_approach.sarsa.constants import *
 
 """
 Q-learning

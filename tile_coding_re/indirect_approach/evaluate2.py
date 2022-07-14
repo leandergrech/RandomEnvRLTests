@@ -3,17 +3,14 @@ from itertools import cycle
 import numpy as np
 import matplotlib.pyplot as plt
 
-from multiprocessing import Pool
-
-from tile_coding_re.tile_coding import QValueFunction2, get_tilings_from_env
+from tile_coding_re.indirect_approach.tile_coding import QValueFunction2, get_tilings_from_env
 from tile_coding_re.utils import TrajSimple, TrajBuffer
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
 
 METHOD = 'sarsa2'
 
 if METHOD == 'sarsa2':
-    from tile_coding_re.sarsa2.constants import par_dir
-    from tile_coding_re.sarsa2.constants import *
+    from tile_coding_re.indirect_approach.sarsa2 import par_dir
 
 
 def get_or_ask_par_dir():
@@ -23,7 +20,7 @@ def get_or_ask_par_dir():
         if par_dir in file:
             avails.append(file)
     if not avails:
-        print(os.path.abspath('.'))
+        print(os.path.abspath('..'))
         print(os.listdir('mc_method'))
         raise FileNotFoundError(par_dir)
     elif len(avails) > 1:

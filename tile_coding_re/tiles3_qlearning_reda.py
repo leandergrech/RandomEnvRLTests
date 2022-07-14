@@ -52,7 +52,7 @@ exploration_str = f'Step decay EXP: {init_exploration}x{exploration_decay_rate}^
 
 gamma = 0.9
 
-nb_eps = 5 00
+nb_eps = 500
 eval_every_t_timesteps = 250
 
 # Training counters

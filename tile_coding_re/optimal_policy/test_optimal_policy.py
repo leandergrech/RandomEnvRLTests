@@ -1,8 +1,6 @@
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tile_coding_re.tile_coding import get_tilings_from_env, QValueFunction2
 from tile_coding_re.buffers import TrajBuffer
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
 

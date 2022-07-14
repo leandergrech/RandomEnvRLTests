@@ -2,9 +2,8 @@ import os
 
 import numpy as np
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
-from tile_coding_re.tile_coding import get_tilings_from_env, QValueFunction2
+from tile_coding_re.indirect_approach.tile_coding import get_tilings_from_env, QValueFunction2
 from tile_coding_re.utils import TrajBuffer
-from tile_coding_re.mc_method.constants import *
 
 from tqdm import trange
 

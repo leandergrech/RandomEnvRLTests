@@ -13,7 +13,7 @@ __pycache__\
 *.txt
 *.ini
 .run*
-!tile_coding_re/q_table_size_heatmaps
+!tile_coding_re/indirect_approach/q_table_size_heatmaps
 *.npy
 *.npz
 *REDA*

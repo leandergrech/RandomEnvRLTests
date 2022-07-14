@@ -6,12 +6,13 @@ from collections import deque
 
 import numpy as np
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
-from tile_coding_re.tile_coding import get_tilings_from_env, QValueFunction2
+from tile_coding_re.indirect_approach.tile_coding import get_tilings_from_env, QValueFunction
 from tile_coding_re.utils import TrajBuffer
-from tile_coding_re.sarsa.constants import *
+from tile_coding_re.indirect_approach.sarsa2.constants import *
 
 """
 Sarsa
+With Double-Q to mitigate maximization bias
 Epsilon-greedy on-policy TD-control
 """
 
@@ -29,7 +30,21 @@ tilings = get_tilings_from_env(env, NB_TILINGS, NB_BINS, range_scale=1.)
 Create tabular Q-function
 '''
 all_actions = get_discrete_actions(N_ACT)
-qvf = QValueFunction2(tilings, all_actions, lr=LR)
+qvf1 = QValueFunction(tilings, all_actions, lr=LR)
+qvf2 = QValueFunction(tilings, all_actions, lr=LR)
+
+
+def get_average_action_value(state, action):
+    val1 = qvf1.value(state, action)
+    val2 = qvf2.value(state, action)
+    return (val1 + val2) / 2
+
+
+def get_average_value(state):
+    val1 = max([qvf1.value(state, a_) for a_ in all_actions])
+    val2 = max([qvf2.value(state, a_) for a_ in all_actions])
+    return (val1 + val2) / 2
+
 
 '''
 Directory  handling
@@ -69,20 +84,30 @@ T = 0
 buffer = TrajBuffer()
 
 
-def policy(state):
-    if np.random.rand() < GREEDY_EPS:  # or T < NB_INIT_STEPS:
-        return env.action_space.sample()
+def greedy_policy(state):
+    # greedy selection of action with the largest value
+    vals = [get_average_action_value(state, a_) for a_ in all_actions]
+
+    return all_actions[np.argmax(vals)]
+
+
+def randomly_swap_q():
+    if np.random.choice(2):
+        return qvf1, qvf2
     else:
-        # greedy selection of action with the largest value
-        return qvf.greedy_action(state)
+        return qvf2, qvf1
 
 
 MAX_STEPS_POSSIBLE = NB_TRAINING_EPS * env.max_steps
 '''Tracking info'''
 time_steps_vs_ep = np.zeros(MAX_STEPS_POSSIBLE)
 ep_lens = np.zeros(NB_TRAINING_EPS)
-td_errors_rolling = deque(maxlen=env.max_steps)
-td_errors_mean = np.zeros(NB_TRAINING_EPS)
+
+td_errors_rolling_1 = deque(maxlen=env.max_steps)
+td_errors_mean_1 = np.zeros(NB_TRAINING_EPS)
+td_errors_rolling_2 = deque(maxlen=env.max_steps)
+td_errors_mean_2 = np.zeros(NB_TRAINING_EPS)
+
 nb_discretization_bins = 50
 state_discretization = np.linspace(-10, 10, nb_discretization_bins - 1)
 visited_states = np.zeros((env.obs_dimension, nb_discretization_bins))
@@ -93,44 +118,57 @@ for ep in trange(NB_TRAINING_EPS):
     d = False
 
     o = env.reset()
-    a1 = policy(o)
+    qvfa, qvfb = qvf1, qvf2
+
+    a1 = greedy_policy(o)
     while not d:
         otp1, r, d, info = env.step(a1)
-        a2 = policy(otp1)
+        if np.random.rand() < GREEDY_EPS(ep):
+            a2 = env.action_space.sample()
+        else:
+            a2 = greedy_policy(otp1)
 
         if r < -1.:
-            r *= 10.0
+            r = -2.
 
         if info['success']:
             target = r  # setting value of terminal state to zero
         else:
-            target = r + GAMMA * qvf.value(otp1, a2)
+            target = r + GAMMA * qvfb.value(otp1, a2)
 
-        qvf.update(o, a1, target)
+        qvfa.update(o, a1, target)
 
         o = otp1
         a1 = a2
 
+        qvfa, qvfb = randomly_swap_q()
+
+        # save stuff
         time_steps_vs_ep[training_t] = ep
-        td_errors_rolling.append(target - qvf.value(o, a1))
+        td_errors_rolling_1.append(target - qvf1.value(o, a1))
+        td_errors_rolling_2.append(target - qvf2.value(o, a1))
         for dim, o_ in enumerate(otp1):
             bidx = np.digitize(o_, state_discretization)
             visited_states[dim, bidx] += 1
 
+        # step counters
         ep_t += 1
         training_t += 1
 
     ep_lens[ep] = ep_t
-    td_errors_mean[ep] = np.mean(td_errors_rolling)
+    td_errors_mean_1[ep] = np.mean(td_errors_rolling_1)
+    td_errors_mean_2[ep] = np.mean(td_errors_rolling_2)
 
     # logging
     if (ep + 1) % SAVE_EVERY == 0:
         # print(f"Episode {ep+1}")
-        qvf.save(os.path.join(save_path, f'{ep + 1}ep'))
+        qvf1.save(os.path.join(save_path, f'{ep + 1}ep', 'qvf1.npz'))
+        qvf2.save(os.path.join(save_path, f'{ep + 1}ep', 'qvf2.npz'))
 time_steps_vs_ep = time_steps_vs_ep[:training_t]
 
 np.save(os.path.join(par_dir, 'training_ep_lens.npy'), ep_lens)
-np.save(os.path.join(par_dir, 'td_errors_mean.npy'), td_errors_mean)
+np.save(os.path.join(par_dir, 'td_errors_mean_1.npy'), td_errors_mean_1)
+np.save(os.path.join(par_dir, 'td_errors_mean_2.npy'), td_errors_mean_2)
 np.save(os.path.join(par_dir, 'time_steps_vs_ep.npy'), time_steps_vs_ep)
 
 tok = par_dir.split('_')
@@ -145,7 +183,8 @@ ax1.plot(ep_lens_smooth1, label='Mean (window=25')
 ax1.plot(ep_lens_smooth2, label='Mean (window=50')
 ax1.set_ylabel('Episode length')
 
-ax2.plot(td_errors_mean)
+ax2.plot(td_errors_mean_1)
+ax2.plot(td_errors_mean_2)
 ax2.set_ylabel('TD errors')
 
 min_state, max_state = state_discretization[0], state_discretization[-1]
