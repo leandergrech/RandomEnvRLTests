@@ -69,12 +69,12 @@ Set all constant parameters throughout the experiment
 '''
 
 # Tiling info
-hparams['nb_tilings'] = nb_tilings = 8
-hparams['nb_bins'] = nb_bins = 2
+hparams['nb_tilings'] = nb_tilings = 16
+hparams['nb_bins'] = nb_bins = 4
 
 # Training info
-hparams['nb_eps'] = nb_eps = 500
-hparams['nb_runs'] = nb_runs = 5
+hparams['nb_eps'] = nb_eps = 150
+hparams['nb_runs'] = nb_runs = 1
 
 # Hyper parameters
 hparams['gamma'] = gamma = 0.99
@@ -203,7 +203,7 @@ def eval_plot():
         with open(fp, 'rb') as f:
             dat = pkl.load(f)
             mean_returns = np.mean(dat['returns'], axis=0)
-            mean_returns_smooth = Series(mean_returns).rolling(5).mean().to_numpy()
+            mean_returns_smooth = Series(mean_returns).rolling(25).mean().to_numpy()
 
             hp = dat['hparams']
             i = hp['iteration']
@@ -213,7 +213,6 @@ def eval_plot():
             key = (i, lr_decay, exp_decay)
             # data_dict[key] = mean_returns
             data_dict[key] = mean_returns_smooth
-            # data_dict[key] = mean_returns
 
             max_val = np.nanmax(mean_returns_smooth)
             # max_val = sum(mean_returns)
@@ -253,6 +252,6 @@ def eval_plot():
 
 
 if __name__ == '__main__':
-    execute_grid()
+    # execute_grid()
     eval_plot()
 

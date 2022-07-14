@@ -23,36 +23,92 @@ class RandomEnvDiscreteActions(RandomEnv):
     ACTION_EPS = 0.1
     AVAIL_MOM = [-ACTION_EPS, 0., ACTION_EPS]
 
-    def __init__(self, *args, **kwargs):
-        super(RandomEnvDiscreteActions, self).__init__(*args, **kwargs)
+    def __init__(self, n_obs, n_act, **kwargs):
+        super(RandomEnvDiscreteActions, self).__init__(n_obs, n_act, **kwargs)
         self.action_space = gym.spaces.MultiDiscrete(np.repeat(3, self.act_dimension))
-        self.cum_action = None
         self.REWARD_SCALE = 1.
-        self.TRIM_FACTOR = 2.
-        self.EPISODE_LENGTH_LIMIT = 30
+        self.TRIM_FACTOR = 20.
+        self.EPISODE_LENGTH_LIMIT = 100
+
+        self.cum_action = None
+        self.action_counter = None
+        self.prev_centered_action = None
 
     def __repr__(self):
         return f'REDA_{self.obs_dimension}obsx{self.act_dimension}act'
 
     def reset(self, init_state=None):
         self.cum_action = np.zeros(self.act_dimension)
+        self.action_counter = np.zeros(self.act_dimension, dtype=int)
+        self.prev_centered_action = np.zeros(self.act_dimension, dtype=int)
         return super(RandomEnvDiscreteActions, self).reset(init_state)
 
     def step(self, action):
         """
         :param action: Array of size self.act_dimension. Each action can be one of (0,1,2) - to index self.AVAIL_MOM
         """
-        for i, a in enumerate(action):
-            assert a in (0, 1, 2), f"Invalid action at index {i}: {a}"
-        delta_action = (np.array(action) - 1) * self.ACTION_EPS
+        # for i, a in enumerate(action):
+        #     assert a in (0, 1, 2), f"Invalid action at index {i}: {a}"
+
+        # Convert from [0, 1, 2] --> [-1, 0, 1]
+        # correct_action = np.array(action) - 1
+        centered_action = np.array(action) - 1
+
+        # self-centering mechanism
+        temp = np.clip(self.action_counter, -1, 1)
+        correct_action = centered_action + np.multiply(temp, np.abs(centered_action) - 1)
+        self.action_counter += correct_action
+
+        delta_action = correct_action * self.ACTION_EPS
         self.cum_action += delta_action
         return super(RandomEnvDiscreteActions, self).step(self.cum_action)
 
-    def get_optimal_action(self, *args, **kwargs):
-        opt_action = super(RandomEnvDiscreteActions, self).get_optimal_action(*args, **kwargs)
+    def get_optimal_action(self, state, state_clip=None):
+        opt_action = super(RandomEnvDiscreteActions, self).get_optimal_action(state, state_clip)
         delta_action = opt_action - self.get_actual_actions()
         return np.sign(np.where(abs(delta_action) < self.ACTION_EPS,
                                 np.zeros_like(delta_action), delta_action)) + 1
 
     def get_actual_actions(self):
         return self.cum_action
+
+
+class VREDA(RandomEnvDiscreteActions):
+    def __init__(self, *args, **kwargs):
+        super(VREDA, self).__init__(*args, **kwargs)
+        # self.observation_space = gym.spaces.Box(low=np.array([-1.0 ,-1.0 ,0.0]),
+        #                                         high=np.array([1.0, 1.0, 0.15]),
+        #                                         dtype=float)
+        # self.velocity = 0.0
+
+    def __repr__(self):
+        return f'VREDA_{self.obs_dimension}obsx{self.act_dimension}act'
+
+    def reset(self, init_state=None):
+        # self.velocity = 0.0
+        if init_state is not None:
+            init_state = init_state[:2]
+        else:
+            init_state = np.random.uniform(-1.0, 1.0, self.obs_dimension)
+
+        init_state = super(VREDA, self).reset(init_state)
+
+        return_val = np.concatenate([init_state, [0.0]])
+        return return_val
+
+    def step(self, action):
+        o = self.current_state.copy()
+        otp1, r, d, info = super(VREDA, self).step(action)
+
+        velocity = np.sqrt(np.sum(np.square(np.subtract(o, otp1))))
+
+        otp1v = np.concatenate([otp1, [velocity]])
+
+        # if sum(abs(otp1) > 2.0) > 0:
+        #     d = True
+
+        return otp1v, r, d, info
+
+    def get_optimal_action(self, state, state_clip=None):
+        return super(VREDA, self).get_optimal_action(state[:2], state_clip)
+

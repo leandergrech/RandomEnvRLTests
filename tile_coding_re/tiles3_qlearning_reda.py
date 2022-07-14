@@ -5,48 +5,63 @@ import matplotlib.pyplot as plt
 from tqdm import trange
 from pandas import Series
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
-from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
+from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions, VREDA
 from tile_coding_re.heatmap_utils import make_heatmap, update_heatmap
 # from tile_coding_re.training_utils import lr
 from tile_coding_re.buffers import TrajBuffer
 import gym
+from copy import deepcopy
 
-env = gym.make('MountainCar-v0')
-eval_env = gym.make('MountainCar-v0')
-
-n_obs = env.observation_space.shape[0]
+'''
+Environment info
+'''
+n_obs = 1
 n_act = 1
+env = VREDA(n_obs, n_act, estimate_scaling=False)
+# env = REDA(n_obs, n_act)
+# eval_env = VREDA(n_obs, n_act, model_info=env.model_info)
+eval_env = deepcopy(env)
 
-nb_tilings = 16
-nb_bins = 4
+'''
+Tiling info
+'''
+nb_tilings = 8
+nb_bins = 2
 
-ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
+ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)] + [[0.0, 0.1]]
 max_tiles = 2 ** 20
 
 tilings = Tilings(nb_tilings, nb_bins, ranges, max_tiles)
-actions = get_discrete_actions(n_act)
+actions = get_discrete_actions(n_act, 3)
 
-# Hyper parameters
-# lr = lr(1e-1, 30000)
-init_lr = 1e-1
-final_lr = 1e-1
-lr_decay_eps = 1000
-lr_fun = lambda ep_i: final_lr + (init_lr - final_lr) * max(0, (1 - ep_i/lr_decay_eps))
-init_exploration = 1.0
-final_exploration = 0.0
-exploration_decay_eps = 1000
-exploration_fun =  lambda ep_i: final_exploration + (init_exploration - final_exploration) * max(0, (1. - ep_i/exploration_decay_eps))
-gamma = 0.99
+'''
+Hyper parameters
+'''
+init_lr = 1.5e-1
+lr_decay_rate = 0.9
+lr_decay_every_eps = 10
+lr_fun = lambda ep_i: init_lr * lr_decay_rate**(ep_i//lr_decay_every_eps)
+lr_str = f'Step decay LR: {init_lr}x{lr_decay_rate}^(ep_idx//{lr_decay_every_eps})'
 
-suptitle_suffix = f'Tilings: {nb_tilings} - Bins: {nb_bins}\n' \
-                  f'Gamma: {gamma}\n' \
-                  f'Linear decay LR:  {init_lr:.2}->{final_lr} in {lr_decay_eps} episodes\n' \
-                  f'Linear decay EPS: {init_exploration}->{final_exploration} in {exploration_decay_eps} episodes'
+# Step-wise decaying exploration
+init_exploration = 0.5
+exploration_decay_rate = 0.9
+exploration_decay_every_eps = 10
+exploration_fun = lambda ep_i: init_exploration * exploration_decay_rate**(ep_i//exploration_decay_every_eps)
+exploration_str = f'Step decay EXP: {init_exploration}x{exploration_decay_rate}^(ep_idx//{exploration_decay_every_eps})'
 
-# Training and evaluation info
-nb_eps = 2000
-eval_every_t_timesteps = 50
+gamma = 0.9
 
+nb_eps = 5 00
+eval_every_t_timesteps = 250
+
+# Training counters
+T = 0
+ep = 0
+
+'''
+Q-function tables and training methods
+'''
 qvf1 = QValueFunctionTiles3(tilings, actions)#, lr)
 qvf2 = QValueFunctionTiles3(tilings, actions)#, lr)
 
@@ -86,9 +101,14 @@ def play_ep_get_obs():
     return obs[0], obs[1]
 
 
-# Set up grid of states for heatmaps
-dim_size = 20
-tracking_states = np.array([list(item) for item in product(*np.array([np.linspace(l, h, dim_size) for l, h in ranges]))])
+'''
+Initialise the states that will have their values and visitations tracked
+'''
+dim_size = int(nb_bins * nb_tilings)
+tracking_lim = 1.0
+# tracking_ranges = np.multiply(ranges[:n_obs], tracking_lim)
+tracking_ranges = np.multiply(ranges, tracking_lim)
+tracking_states = np.array([list(item) for item in product(*np.array([np.linspace(l, h, dim_size) for l, h in tracking_ranges]))])
 nb_tracked = tracking_states.shape[0]
 reshape_to_map = lambda arr: arr.reshape(dim_size, dim_size).T
 
@@ -96,6 +116,13 @@ reshape_to_map = lambda arr: arr.reshape(dim_size, dim_size).T
 tracked_vals = np.zeros(nb_tracked)
 state_visitation = np.repeat(np.nan, nb_tracked)
 
+'''
+Initialise all plots
+'''
+suptitle_suffix = f'Tilings: {nb_tilings} - Bins: {nb_bins}\n' \
+                  f'Gamma: {gamma}\n' \
+                  f'{lr_str}\n' \
+                  f'{exploration_str}'
 plt.ion()
 figsize = (10, 8)
 gs_kw = dict(width_ratios=[1, 1], height_ratios=[3, 1, 1])
@@ -109,25 +136,28 @@ ax_sv = axd['sv']
 ax_cum_rew = axd['cum_rew']
 ax_err = axd['err']
 
-# fig, (ax_val, ax_sv) = plt.subplots(1, 2, figsize=figsize)
 nb_heatmaps = 2
 fig.suptitle(f'\n\n{suptitle_suffix}')
 
 # Initialise heatmaps
-im_val = make_heatmap(ax_val, reshape_to_map(tracked_vals), *ranges, '\n')
+im_val = make_heatmap(ax_val, reshape_to_map(tracked_vals), *tracking_ranges, '\n')
 ax_val.set_title('Estimated values')
-im_sv = make_heatmap(ax_sv, reshape_to_map(state_visitation), *ranges, '\n')
+im_sv = make_heatmap(ax_sv, reshape_to_map(state_visitation), *tracking_ranges, '\n')
 ax_sv.set_title('State visitation')
 
 for ax in (ax_val, ax_sv):
     ax.set_xlabel('Position')
     ax.set_ylabel('Velocity')
-    ax.axvline(env.goal_position, c='c', label='Goal position')
+    if n_obs > 1:
+        ax.add_patch(plt.Circle((0., 0.), env.GOAL, edgecolor='g', facecolor='None', label='Threshold'))
+    else:
+        ax.axvline(-env.GOAL, c='g', label='Threshold')
+        ax.axvline(env.GOAL, c='g')
 
 # fig.tight_layout()
 
 # Initialise sample episode traces
-nb_eval_eps = 5
+nb_eval_eps = 20
 ep_lines = [[] for _ in range(nb_heatmaps)]
 ep_starting_points = [[] for _ in range(nb_heatmaps)]
 ep_terminal_points = [[] for _ in range(nb_heatmaps)]
@@ -142,37 +172,39 @@ for ep_nb in range(nb_eval_eps):
             label_point_start = None
             label_point_finish = None
 
-        ep_lines[i].append(ax.plot([], [], marker='x', c='m', lw=0.2, label=label_line)[0])
+        ep_lines[i].append(ax.plot([], [], marker='x', c='m', lw=0.1, label=label_line)[0])
         ep_starting_points[i].append(ax.plot([], [], c='k', marker='o', markersize=2, label=label_point_start)[0])
-        ep_terminal_points[i].append(ax.plot([], [], c='k', marker='s', markersize=4, label=label_point_finish)[0])
+        ep_terminal_points[i].append(ax.plot([], [], c='r', marker='s', markersize=4, label=label_point_finish)[0])
 for ax in (ax_val, ax_sv):
-    ax.legend(loc='best')
+    ax.legend(loc='best', prop=dict(size=8))
 
 # Tracking errors
-# fig2, ax3 = plt.subplots()
 cum_rew_line, = ax_cum_rew.plot([], [])
-ax_cum_rew.set_xlabel('Training episodes')
-ax_cum_rew.set_ylabel('Cumulative rewards')
+ax_cum_rew.set_ylabel('Total rewards')
 cum_rews = []
 
 errors_line1, = ax_err.plot([], [])
 errors_line2, = ax_err.plot([], [])
-ax_err.set_xlabel('Time steps')
-ax_err.set_ylabel('Error=Target-Estimate')
+ax_err.set_ylabel('TD errors')
 errors1 = []
 errors2 = []
 
-# Training counters
-T = 0
-ep = 0
+for ax in (ax_cum_rew, ax_err):
+    ax.set_xlabel('Training episodes')
+    ax.set_yscale('symlog')
 
-# Evaluation steps
+'''
+Evaluation info
+'''
 is_eval = lambda: (T + 1) % eval_every_t_timesteps == 0 or T == 0
+lr, exploration = None, None
 def eval():
-    fig.suptitle(f'Episode {ep+1:4d} - Step {T+1:4d}\nIHT count {tilings.count():6d}\n{suptitle_suffix}')
+    fig.suptitle(f'Episode {ep+1:4d} - Step {T+1:4d}\nIHT count {tilings.count():6d}\n'
+                 f'LR={lr:.4f}\tEXP={exploration:.2f}\n{suptitle_suffix}')
 
     # Update estimated value heatmaps
     for j, ts in enumerate(tracking_states):
+        ts = np.concatenate([ts, [np.random.rand()*0.15]])
         v = max([(v1 + v2)/2. for v1, v2 in zip(get_qvals(ts, qvf1), get_qvals(ts, qvf2))])
         tracked_vals[j] = v
     update_heatmap(im_val, reshape_to_map(tracked_vals))
@@ -197,7 +229,7 @@ def eval():
         ax_cum_rew.set_ylim((np.nanmin(cum_rews_mean), np.nanmax(cum_rews_mean)))
 
     # Update error plot
-    error_averaging_window = 10
+    error_averaging_window = 1
     errors1_mean = Series(errors1).rolling(error_averaging_window).mean().to_numpy().tolist()
     errors2_mean = Series(errors2).rolling(error_averaging_window).mean().to_numpy().tolist()
     errors_line1.set_data(range(len(errors1)), errors1_mean)
@@ -208,20 +240,37 @@ def eval():
     plt.pause(0.1)
 
 
-# Start training
+def update_state_visitations(state):
+    # state = state[:n_obs]
+    if sum(np.abs(state) > tracking_lim) == 0:
+        sv_index = np.argmin(np.mean(np.abs(np.subtract(tracking_states, state)), axis=1))
+        if np.isnan(state_visitation[sv_index]):
+            state_visitation[sv_index] = 1
+        else:
+            state_visitation[sv_index] += 1
+
+'''
+Training
+'''
 for ep in trange(nb_eps):
     o = env.reset()
     done = False
     cum_rew = 0.0
+
+    err1, err2 = 0.0, 0.0
+    step = 0
     while not done:
+        # Explore or exploit
         exploration = exploration_fun(ep)
         if np.random.rand() < exploration:
-            a = env.action_space.sample()
+            a = env.action_space.sample().tolist()
         else:
             a = get_total_greedy_action(o)
-        
+
+        # Step in environment dynamics
         otp1, r, done, info = env.step(a)
 
+        # Calculate targets and update Q-functions
         qvfa, qvfb = swap_q()
         target = r + gamma * qvfb.value(otp1, qvfa.greedy_action(otp1))
 
@@ -231,29 +280,27 @@ for ep in trange(nb_eps):
         # Increment cumulative reward
         cum_rew += r
 
-        # Log state visitations for heatmap
-        sv_index = np.argmin(np.mean(np.abs(np.subtract(tracking_states, o)), axis=1))
-        temp = np.isnan(state_visitation[sv_index])
-        if np.isnan(state_visitation[sv_index]):
-            state_visitation[sv_index] = 1
-        else:
-            state_visitation[sv_index] += 1
+        # Increment state visitations for heatmap
+        update_state_visitations(o)
 
         # Log errors for plotting
         if qvfa == qvf1:
-            errors1.append(error)
+            err1 += error
         else:
-            errors2.append(error)
+            err2 += error
 
         # Cycle variables and increment counters
         o = otp1.copy()
         T += 1
+        step += 1
 
         # Evaluation phase
         if is_eval() or ((ep == nb_eps - 1) and done):
-        # if ((ep == nb_eps - 1) and done):
             eval()
     cum_rews.append(cum_rew)
+    errors1.append(err1)
+    errors2.append(err2)
+
 plt.ioff()
 # plt.savefig(os.path.join('results', f'doubleQLearning_mountainCar_{nb_tilings}Tilings_{nb_bins}Bins.png'))
 plt.show()

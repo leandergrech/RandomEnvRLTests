@@ -13,7 +13,7 @@ import pickle as pkl
 class RandomEnv(Env):
     REWARD_DEQUE_SIZE = 1  # 5
     ACTION_SCALE = 1.0  # set to one during dynamic output scale adjustment test
-    GOAL = 0.1  # state threshold boundary
+
     _UPDATE_SCALING = False
 
     RESET_RANDOM_WALK_STEPS = 50  # Reset func starts from optimal state, and walks randomly for these amount of steps
@@ -35,6 +35,7 @@ class RandomEnv(Env):
         # Have many times smaller should the average state trim be than an state space bounds
         self.TRIM_FACTOR = 5.
         self.EPISODE_LENGTH_LIMIT = 100
+        self.GOAL = 0.1  # state threshold boundary
 
         self.obs_dimension, self.act_dimension = n_obs, n_act
 
@@ -50,7 +51,7 @@ class RandomEnv(Env):
         ''' RL related parameters'''
         self.current_state = None
         self._reward = None
-        self.reward_thresh = self.objective([RandomEnv.GOAL] * self.obs_dimension)
+        self.reward_thresh = self.objective([self.GOAL] * self.obs_dimension)
         self.reward_deque = deque(maxlen=RandomEnv.REWARD_DEQUE_SIZE)
         self._it = 0
         self.max_steps = self.EPISODE_LENGTH_LIMIT
@@ -110,15 +111,15 @@ class RandomEnv(Env):
 
     # @staticmethod
     def objective(self, state):
-        # state_reward = -np.sum(np.square(state)) / self.obs_dimension
-        state_reward = -np.sqrt(np.mean(np.square(state)))
+        state_reward = -np.sum(np.square(state)) / self.obs_dimension
+        # state_reward = -np.sqrt(np.mean(np.square(state)))
         return state_reward * self.REWARD_SCALE
 
     def _is_done(self):
         done, success = False, False
         # Reach goal
         if len(self.reward_deque) >= RandomEnv.REWARD_DEQUE_SIZE and \
-                np.max(np.abs(self.current_state)) <= RandomEnv.GOAL:
+                np.max(np.abs(self.current_state)) <= self.GOAL:
             done, success = True, True
         elif self._it >= self.EPISODE_LENGTH_LIMIT - 1:
             done = True
@@ -146,6 +147,13 @@ class RandomEnv(Env):
 
     def create_model(self):
         n_obs, n_act = self.obs_dimension, self.act_dimension
+
+        if n_obs == 1 and n_act == 1:
+            self.rm = np.array([np.random.rand() + 1.0])
+            self.pi = 1/self.rm
+
+            return
+
 
         # Instantiate left & right singular vectors, and singular value matrices
         u = stats.ortho_group.rvs(n_obs)

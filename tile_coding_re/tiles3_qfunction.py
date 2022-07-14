@@ -50,9 +50,9 @@ class QValueFunctionTiles3:
         self.tilings = tilings
         self.actions = actions
         # self.lr = lambda: next(lr) / len(tilings)
-        # init_q_val = -1.0
-        # self.q_table = [init_q_val for _ in range(tilings.max_tiles)]
-        self.q_table = [-rand() for _ in range(tilings.max_tiles)]
+        init_q_val = -2.0
+        self.q_table = [init_q_val for _ in range(tilings.max_tiles)]
+        # self.q_table = [-rand() for _ in range(tilings.max_tiles)]
 
         self.nb_updates = 0
 
