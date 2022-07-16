@@ -51,23 +51,36 @@ class RandomEnvDiscreteActions(RandomEnv):
         #     assert a in (0, 1, 2), f"Invalid action at index {i}: {a}"
 
         # Convert from [0, 1, 2] --> [-1, 0, 1]
-        # correct_action = np.array(action) - 1
         centered_action = np.array(action) - 1
+        '''
+        increment self.cum_action
+        '''
+        # delta_action = centered_action * self.ACTION_EPS
+        # self.cum_action += delta_action
+        # return super(RandomEnvDiscreteActions, self).step(self.cum_action)
 
-        # self-centering mechanism
-        temp = np.clip(self.action_counter, -1, 1)
-        correct_action = centered_action + np.multiply(temp, np.abs(centered_action) - 1)
-        self.action_counter += correct_action
+        '''
+        self-centering mechanism
+        '''
+        # temp = np.clip(self.action_counter, -1, 1)
+        # correct_action = centered_action + np.multiply(temp, np.abs(centered_action) - 1)
+        # self.action_counter += correct_action
+        # delta_action = correct_action * self.ACTION_EPS
+        # self.cum_action += delta_action
+        # return super(RandomEnvDiscreteActions, self).step(self.cum_action)
 
-        delta_action = correct_action * self.ACTION_EPS
-        self.cum_action += delta_action
-        return super(RandomEnvDiscreteActions, self).step(self.cum_action)
+        '''
+        apply small action as is
+        '''
+        delta_action = centered_action * self.ACTION_EPS
+        return super(RandomEnvDiscreteActions, self).step(delta_action)
 
     def get_optimal_action(self, state, state_clip=None):
         opt_action = super(RandomEnvDiscreteActions, self).get_optimal_action(state, state_clip)
         delta_action = opt_action - self.get_actual_actions()
-        return np.sign(np.where(abs(delta_action) < self.ACTION_EPS,
+        discrete_action = np.sign(np.where(abs(delta_action) < self.ACTION_EPS,
                                 np.zeros_like(delta_action), delta_action)) + 1
+        return discrete_action.astype(int).tolist()
 
     def get_actual_actions(self):
         return self.cum_action
@@ -110,5 +123,9 @@ class VREDA(RandomEnvDiscreteActions):
         return otp1v, r, d, info
 
     def get_optimal_action(self, state, state_clip=None):
-        return super(VREDA, self).get_optimal_action(state[:2], state_clip)
+        if self.obs_dimension == 1:
+            working_state = [state[0]]
+        else:
+            working_state = state[:self.obs_dimension]
+        return super(VREDA, self).get_optimal_action(working_state, state_clip)
 

@@ -18,8 +18,6 @@ class RandomEnv(Env):
 
     RESET_RANDOM_WALK_STEPS = 50  # Reset func starts from optimal state, and walks randomly for these amount of steps
     SAVED_MODEL_SUFFIX = '_dynamics.pkl'
-    K_p = 1.0
-    K_i = 0.0
 
     def __init__(self, n_obs, n_act, estimate_scaling=True, model_info=None):
         """
@@ -36,6 +34,9 @@ class RandomEnv(Env):
         self.TRIM_FACTOR = 5.
         self.EPISODE_LENGTH_LIMIT = 100
         self.GOAL = 0.1  # state threshold boundary
+
+        self.K_p = 1.0
+        self.K_i = 0.0
 
         self.obs_dimension, self.act_dimension = n_obs, n_act
 
@@ -88,7 +89,8 @@ class RandomEnv(Env):
         self.reward_deque.clear()
         self._it = 0
 
-        self.prev_error = np.zeros(self.obs_dimension)
+        # Used by PI controller in get_optimal_action
+        self.prev_state = np.zeros(self.obs_dimension)
 
         return np.copy(init_state)
 
@@ -98,7 +100,7 @@ class RandomEnv(Env):
         trim_state = self.rm.dot(action)
 
         # Standardise trims by stats in trim_stats
-        trim_state = self.standardise_trim(trim_state)
+        # trim_state = self.standardise_trim(trim_state)
 
         self.current_state += trim_state
         r = self.objective(self.current_state)
@@ -128,9 +130,14 @@ class RandomEnv(Env):
     def get_optimal_action(self, state, state_clip=None):
         if state_clip:
             state = np.clip(state, -state_clip, state_clip)
-        self.prev_error = np.copy(state)  # in case integral controller is used as well
 
-        action = -self.pi.dot(RandomEnv.K_p * state + RandomEnv.K_i * self.prev_error)
+        # PI controller
+        error = np.multiply(self.K_p, state) + np.multiply(self.K_i, self.prev_state)
+        action = -self.pi.dot(error)
+        if self.act_dimension == 1:
+            action = np.array([action])
+        self.prev_state = np.copy(state)  # cycle error
+
         return action / max([1.0, max(abs(action))])  # linearly scaled response to fit within [-1, 1]
 
     @property

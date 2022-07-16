@@ -111,23 +111,28 @@ def testing_vreda_eplens():
 
 def vreda_diagnostic_plots():
     env = VREDA(2, 2)
-    o = env.reset([-.1,0.1])
+    env.TRIM_FACTOR = 4.
+    # o = env.reset([-.1,0.1])
+    o = env.reset()
     d = False
     obses = [o[:2]]
     acts = [[1,1]]
     vels = [0.0]
     cacts = [[0.,0.]]
 
-    destiny = [[0,2], [0,2], [1,1], [1,1], [2,1], [2,1], [2,0], [2,0], [2,1], [0,1], [0,1], [1,1], [1,1], [1,1]]
-
-    for a in destiny:
+    # destiny = [[0,2], [0,2], [1,1], [1,1], [2,1], [2,1], [2,0], [2,0], [2,1], [0,1], [0,1], [1,1], [1,1], [1,1]]
+    # for a in destiny:
+    step = 0
+    while step < 10000:
         # a = env.get_optimal_action(o)
+        a = env.action_space.sample()
         otp1, r, d, _ = env.step(a)
 
         cacts.append(env.cum_action.copy())
         obses.append(otp1[:2])
         acts.append(a)
         vels.append(otp1[2])
+        step += 1
 
     import matplotlib.pyplot as plt
 
@@ -135,11 +140,12 @@ def vreda_diagnostic_plots():
     fig.suptitle(repr(env))
     # ax1.add_patch(plt.Circle([0, 0], env.GOAL, facecolor='None', edgecolor='g', ls='dashed'))
     obses = np.array(obses).T
+    ax1.add_patch(plt.Circle((0,0), env.GOAL, facecolor='None', edgecolor='g'))
     ax1.plot(obses[0], obses[1], marker='x')
     ax1.scatter(obses[0][0], obses[1][0], marker='o', c='k', label='Start')
     ax1.set_xlabel('State[0]')
     ax1.set_ylabel('State[1]')
-    lim = 0.15
+    lim = 1.0
     ax1.set_ylim((-lim,lim))
     ax1.set_xlim((-lim,lim))
     ax1.legend(loc='best')
@@ -172,5 +178,5 @@ def vreda_diagnostic_plots():
 
 if __name__ == '__main__':
     # testing_vreda_velocities()
-    testing_vreda_eplens()
-    # vreda_diagnostic_plots()
+    # testing_vreda_eplens()
+    vreda_diagnostic_plots()
