@@ -153,7 +153,7 @@ def in_order_traversal(root):
         res = res + in_order_traversal(root.right)
     return res
 
-def plot_tiles(adaptive_tile):
+def plot_tiles(adaptive_tile, agent, env):
     import matplotlib.pyplot as plt
 
     all_ranges = in_order_traversal(adaptive_tile)
@@ -164,11 +164,25 @@ def plot_tiles(adaptive_tile):
     ax.set_ylim(*orig_ranges[1])
     for r in all_ranges:
         ax.add_patch(plt.Rectangle(*ranges_to_rect(r), facecolor='None', edgecolor='k'))
+
+    o = env.reset()
+    d = False
+    obses = []
+    while not d:
+        a = agent.get_greedy_action(o)
+        obses.append(o)
+        otp1, r, d, _ = env.step(a)
+        o = otp1
+    obses = np.array(obses).T
+    ax.plot(obses[0], obses[1])
+    ax.scatter(obses[0][0], obses[1][0], marker='x')
+
     plt.show()
 
 def train():
     env = gym.make('MountainCar-v0')
     actions = get_discrete_actions(n_act=1, act_dim=3)
+    nb_actions = len(actions)
 
     ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
 
@@ -178,8 +192,9 @@ def train():
 
     u = 0
 
-    max_timesteps = 100000
-    gamma = 0.999
+    max_timesteps = 10000
+
+    gamma = 0.99
     alpha = 0.1
     p = 50
 
@@ -188,7 +203,10 @@ def train():
 
     pbar = tqdm(maxinterval=max_timesteps)
     while T < max_timesteps:
-        action_idx = agent.get_greedy_action(o)
+        if np.random.rand() < 0.1:
+            action_idx = np.random.choice(nb_actions)
+        else:
+            action_idx = agent.get_greedy_action(o)
         a = actions[action_idx]
 
         otp1, r, d, _ = env.step(a)
@@ -225,7 +243,7 @@ def train():
         if (T+1) % 100 == 0:
             pbar.update(100)
     pbar.close()
-    plot_tiles(tiling)
+    plot_tiles(tiling, agent, env)
 
 
 if __name__ == '__main__':
