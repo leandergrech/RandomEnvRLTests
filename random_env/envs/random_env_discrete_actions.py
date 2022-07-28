@@ -93,6 +93,8 @@ class VREDA(RandomEnvDiscreteActions):
         #                                         high=np.array([1.0, 1.0, 0.15]),
         #                                         dtype=float)
         # self.velocity = 0.0
+        self.observation_space.low = np.concatenate([self.observation_space.low, [0.0]])
+        self.observation_space.high = np.concatenate([self.observation_space.high, [0.15]])
 
     def __repr__(self):
         return f'VREDA_{self.obs_dimension}obsx{self.act_dimension}act'

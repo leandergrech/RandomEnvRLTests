@@ -5,6 +5,7 @@ from copy import deepcopy
 import gym
 from random_env.envs import get_discrete_actions
 from tqdm import tqdm
+from random_env.envs import VREDA
 
 
 class AdaptiveTile:
@@ -51,7 +52,7 @@ class AdaptiveTile:
 
     def in_tile(self, state):
         for s_, r_ in zip(state, self.ranges):
-            if s_ < r_[0] or s_ >= r_[1]:
+            if s_ < r_[0] or s_ > r_[1]:
                 return False
         return True
 
@@ -102,8 +103,8 @@ class Agent:
     def __init__(self, tiling, actions):
         self.tiling = tiling
         self.actions = actions
-        self.benefits = defaultdict(float)
-        self.highest_benefit = 0.0
+        self.metrics = defaultdict(float)
+        self.highest_metric = 0.0
         self.best_candidate_for_split = dict(tile=None, k=None)
 
     def get_greedy_action(self, state) -> int:
@@ -117,74 +118,136 @@ class Agent:
 
         return action_idx
 
+    # def split_criterion(self, state):
+    #     active_tile = self.tiling.get_active_tile(state)
+    #     for k, sub_tiles in active_tile.sub_tiles.items():
+    #         for sub_tile in sub_tiles:
+    #             if not sub_tile.in_tile(state):
+    #                 continue
+    #             advantage = max(np.subtract(sub_tile.values, active_tile.values))
+    #             if advantage > 0:
+    #                 self.benefits[sub_tile.hash] += advantage
+    #                 cur_benefit = self.benefits[sub_tile.hash]
+    #                 if cur_benefit > self.highest_benefit:
+    #                     self.highest_benefit = cur_benefit
+    #                     self.best_candidate_for_split['tile'] = active_tile
+    #                     self.best_candidate_for_split['k'] = k
     def split_criterion(self, state):
         active_tile = self.tiling.get_active_tile(state)
         for k, sub_tiles in active_tile.sub_tiles.items():
             for sub_tile in sub_tiles:
                 if not sub_tile.in_tile(state):
                     continue
-                advantage = max(sub_tile.values) - max(active_tile.values)
-                if advantage > 0:
-                    self.benefits[sub_tile.hash] += advantage
-                    cur_benefit = self.benefits[sub_tile.hash]
-                    if cur_benefit > self.highest_benefit:
-                        self.highest_benefit = cur_benefit
-                        self.best_candidate_for_split['tile'] = active_tile
-                        self.best_candidate_for_split['k'] = k
+                self.metrics[sub_tile.hash] += 1    # state visitation
+                cur = self.metrics[sub_tile.hash]
+                if cur > self.highest_metric:
+                    self.highest_metric = cur
+                    self.best_candidate_for_split['tile'] = active_tile
+                    self.best_candidate_for_split['k'] = k
+
 
     def split_a_tile(self):
         tile_to_split = self.best_candidate_for_split['tile']
         k = self.best_candidate_for_split['k']
         # print(f'{str(tile_to_split)} at dim {k}\tDeltaV={tile_to_split.lowest_td_error}')
         tile_to_split.split_tile(k)
-        self.highest_benefit = 0.0
+        self.highest_metric = 0.0
 
-def ranges_to_rect(ranges):
-    xy = (ranges[0][0], ranges[1][0])
-    width = np.ptp(ranges[0])
-    height = np.ptp(ranges[1])
-    return xy, width, height
-
-def in_order_traversal(root):
-    res = []
-    if root:
-        res = in_order_traversal(root.left)
-        res.append(root.ranges)
-        res = res + in_order_traversal(root.right)
-    return res
 
 def plot_tiles(adaptive_tile, agent, env):
     import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    from itertools import product
 
-    all_ranges = in_order_traversal(adaptive_tile)
+    def ranges_to_rect(ranges):
+        xy = (ranges[0][0], ranges[1][0])
+        width = np.ptp(ranges[0])
+        height = np.ptp(ranges[1])
+        return xy, width, height
 
-    fig, ax = plt.subplots()
-    orig_ranges = adaptive_tile.ranges
+
+    def get_leaves(root):
+        res = []
+        if root.has_children():
+            res += get_leaves(root.left)
+            res += get_leaves(root.right)
+        else:
+            return [root]
+
+        return res
+
+
+    def in_order_traversal(root):
+        res = []
+        if root:
+            temp = in_order_traversal(root.left)
+            if not root.left.has_children():
+                res = temp
+                v = max(root.values)
+                res.append([root.ranges, v])
+            temp = in_order_traversal()
+            res = res + in_order_traversal(root.right)
+        return res
+
+
+    orig_ranges = np.array(adaptive_tile.ranges)
+
+    fig, (ax, ax_cm) = plt.subplots(2, gridspec_kw=dict(height_ratios=[10,1]))
+
+    # heatmap
+    # nb_bins = 100
+    #
+    # states = [item for item in product(*[np.linspace(l, h, nb_bins) for l, h in
+    #                                      zip(orig_ranges.T[0], orig_ranges.T[1])])]
+    # vals = []
+    # for s in states:
+    #     v = max(adaptive_tile.get_active_tile(s).values)
+    #     vals.append(v)
+    # vals = np.array(vals).reshape(nb_bins, nb_bins).T
+    # extents = np.ravel(orig_ranges)
+    # im = ax.matshow(vals, extent=extents, aspect='auto', origin='lower', cmap='jet')
+    # plt.colorbar(im)
+
+    # tiles
+    # all_nodes = in_order_traversal(adaptive_tile)
+    all_nodes = get_leaves(adaptive_tile)
+    max_v = min([max(node.values) for node in all_nodes])
+
     ax.set_xlim(*orig_ranges[0])
     ax.set_ylim(*orig_ranges[1])
-    for r in all_ranges:
-        ax.add_patch(plt.Rectangle(*ranges_to_rect(r), facecolor='None', edgecolor='k'))
+    cm = mpl.cm.cool
+    for node in all_nodes:
+        r = node.ranges
+        v = max(node.values)
+        ax.add_patch(plt.Rectangle(*ranges_to_rect(r), facecolor=cm(1 - v/max_v), edgecolor='None'))
+    norm = mpl.colors.Normalize(vmin=max_v, vmax=0.0)
 
-    o = env.reset()
-    d = False
-    obses = []
-    while not d:
-        a = agent.get_greedy_action(o)
-        obses.append(o)
-        otp1, r, d, _ = env.step(a)
-        o = otp1
-    obses = np.array(obses).T
-    ax.plot(obses[0], obses[1])
-    ax.scatter(obses[0][0], obses[1][0], marker='x')
+    fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cm),
+                 cax=ax_cm, orientation='horizontal')
+    # sample trajectory
+    for _ in range(5):
+        o = env.reset()
+        d = False
+        obses = []
+        while not d:
+            a = agent.get_greedy_action(o)
+            obses.append(o)
+            otp1, r, d, _ = env.step(a)
+            o = otp1
+        obses = np.array(obses).T
+        ax.plot(obses[0], obses[1], marker='x', zorder=10)
+        ax.scatter(obses[0][0], obses[1][0], marker='o', s=20, c='c', zorder=15)
 
     plt.show()
 
 def train():
     env = gym.make('MountainCar-v0')
+    # env = VREDA(1, 1)
     actions = get_discrete_actions(n_act=1, act_dim=3)
     nb_actions = len(actions)
 
-    ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
+    range_scale = 1.
+    ranges = [[range_scale*l, range_scale*h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
 
     tiling = AdaptiveTile(ranges, len(actions))
 
@@ -194,14 +257,14 @@ def train():
 
     max_timesteps = 10000
 
-    gamma = 0.99
+    gamma = 0.999
     alpha = 0.1
-    p = 50
+    p = 5
 
     T = 0
     o = env.reset()
 
-    pbar = tqdm(maxinterval=max_timesteps)
+    pbar = tqdm(total=max_timesteps)
     while T < max_timesteps:
         if np.random.rand() < 0.1:
             action_idx = np.random.choice(nb_actions)
