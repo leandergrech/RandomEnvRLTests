@@ -5,7 +5,7 @@ from copy import deepcopy
 import gym
 from random_env.envs import get_discrete_actions
 from tqdm import tqdm
-from random_env.envs import VREDA
+from random_env.envs import VREDA, RandomEnvDiscreteActions as REDA
 
 
 class AdaptiveTile:
@@ -42,13 +42,22 @@ class AdaptiveTile:
         for k in range(self.K):
             dim_half_width = (self.ranges[k][1] - self.ranges[k][0]) / 2.0
 
-            ranges = deepcopy(self.ranges)
-            ranges[k][1] -= dim_half_width      # Max of first tile in kth dimension is up to split
-            self.sub_tiles[k].append(AdaptiveTile(ranges, self.nb_actions, False))
+            add = lambda x,y: x + y
+            subtract = lambda x, y: x - y
+            for i, func in zip(range(2), (subtract, add)):
+                ranges = deepcopy(self.ranges)
+                ranges[k][1 - i] = func(ranges[k][1-i], dim_half_width)
+                sub_tile = AdaptiveTile(ranges, self.nb_actions, False)
+                sub_tile.values = deepcopy(self.values)
+                self.sub_tiles[k].append(sub_tile)
 
-            ranges = deepcopy(self.ranges)
-            ranges[k][0] += dim_half_width      # Min of second tile in kth dimension starts from split
-            self.sub_tiles[k].append(AdaptiveTile(ranges, self.nb_actions, False))
+            # ranges = deepcopy(self.ranges)
+            # ranges[k][1] -= dim_half_width      # Max of first tile in kth dimension is up to split
+            # self.sub_tiles[k].append(AdaptiveTile(ranges, self.nb_actions, False))
+            #
+            # ranges = deepcopy(self.ranges)
+            # ranges[k][0] += dim_half_width      # Min of second tile in kth dimension starts from split
+            # self.sub_tiles[k].append(AdaptiveTile(ranges, self.nb_actions, False))
 
     def in_tile(self, state):
         for s_, r_ in zip(state, self.ranges):
@@ -74,6 +83,8 @@ class AdaptiveTile:
                 tile = tile.left
             elif tile.right.in_tile(state):
                 tile = tile.right
+            else:
+                raise Exception(f'state')
         return tile
 
     def get_sub_tiles_activated(self, state):
@@ -117,6 +128,9 @@ class Agent:
         action_idx = max([(v, i) for i, v in enumerate(q_values)])[1]   # argmax
 
         return action_idx
+
+    def get_greedy_action_decoded(self, state):
+        return self.actions[self.get_greedy_action(state)]
 
     # def split_criterion(self, state):
     #     active_tile = self.tiling.get_active_tile(state)
@@ -177,23 +191,23 @@ def plot_tiles(adaptive_tile, agent, env):
         return res
 
 
-    def in_order_traversal(root):
-        res = []
-        if root:
-            temp = in_order_traversal(root.left)
-            if not root.left.has_children():
-                res = temp
-                v = max(root.values)
-                res.append([root.ranges, v])
-            temp = in_order_traversal()
-            res = res + in_order_traversal(root.right)
-        return res
+    # def in_order_traversal(root):
+    #     res = []
+    #     if root:
+    #         temp = in_order_traversal(root.left)
+    #         if not root.left.has_children():
+    #             res = temp
+    #             v = max(root.values)
+    #             res.append([root.ranges, v])
+    #         temp = in_order_traversal()
+    #         res = res + in_order_traversal(root.right)
+    #     return res
 
 
     orig_ranges = np.array(adaptive_tile.ranges)
 
     fig, (ax, ax_cm) = plt.subplots(2, gridspec_kw=dict(height_ratios=[10,1]))
-
+    # plt.ion()
     # heatmap
     # nb_bins = 100
     #
@@ -215,34 +229,36 @@ def plot_tiles(adaptive_tile, agent, env):
 
     ax.set_xlim(*orig_ranges[0])
     ax.set_ylim(*orig_ranges[1])
-    cm = mpl.cm.cool
-    for node in all_nodes:
+    cm = mpl.cm.jet
+    for i, node in enumerate(all_nodes):
         r = node.ranges
         v = max(node.values)
-        ax.add_patch(plt.Rectangle(*ranges_to_rect(r), facecolor=cm(1 - v/max_v), edgecolor='None'))
-    norm = mpl.colors.Normalize(vmin=max_v, vmax=0.0)
+        ax.add_patch(plt.Rectangle(*ranges_to_rect(r), facecolor=cm(1 - v/max_v), edgecolor='k', lw=-.2))
+        # plt.pause(1)
 
-    fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cm),
-                 cax=ax_cm, orientation='horizontal')
     # sample trajectory
-    for _ in range(5):
+    for _ in range(2):
         o = env.reset()
         d = False
         obses = []
         while not d:
-            a = agent.get_greedy_action(o)
+            a = agent.get_greedy_action_decoded(o)
             obses.append(o)
             otp1, r, d, _ = env.step(a)
             o = otp1
         obses = np.array(obses).T
-        ax.plot(obses[0], obses[1], marker='x', zorder=10)
-        ax.scatter(obses[0][0], obses[1][0], marker='o', s=20, c='c', zorder=15)
+        ax.plot(obses[0], obses[1], zorder=10)
+        ax.scatter(obses[0][0], obses[1][0], marker='o', s=20, facecolor='None', edgecolor='c', zorder=15)
+
+    fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=max_v, vmax=0.0), cmap=cm),
+                 cax=ax_cm, orientation='horizontal')
+    ax.legend(handles=[plt.Line2D([],[],c='k', marker='x'), plt.scatter([],[],marker='o')], labels=['Sample trajectory'])
 
     plt.show()
 
 def train():
     env = gym.make('MountainCar-v0')
-    # env = VREDA(1, 1)
+    # env = REDA(2, 2)
     actions = get_discrete_actions(n_act=1, act_dim=3)
     nb_actions = len(actions)
 
@@ -255,18 +271,23 @@ def train():
 
     u = 0
 
-    max_timesteps = 10000
+    max_timesteps = 50000
 
-    gamma = 0.999
+    gamma = 0.99
     alpha = 0.1
-    p = 5
+    p = 200
 
     T = 0
     o = env.reset()
 
+    init_exp = 1.0
+    exp_decay_rate = 0.95
+    exp_decay_every = 1000  # int(nb_eps/10)
+    exp_fun = lambda i: init_exp * exp_decay_rate ** (i // exp_decay_every)
+
     pbar = tqdm(total=max_timesteps)
     while T < max_timesteps:
-        if np.random.rand() < 0.1:
+        if np.random.rand() < exp_fun(T):
             action_idx = np.random.choice(nb_actions)
         else:
             action_idx = agent.get_greedy_action(o)

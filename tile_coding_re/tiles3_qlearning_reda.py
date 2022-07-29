@@ -57,7 +57,7 @@ exploration_str = f'Step decay EXP: {init_exploration}x{exploration_decay_rate}^
 
 gamma = 0.9
 
-nb_eps = 150
+nb_eps = 100
 eval_every_t_timesteps = 100
 
 # Training counters
@@ -139,7 +139,7 @@ figsize = (10, 8)
 gs_kw = dict(width_ratios=[1, 1], height_ratios=[3, 1, 1, 1])
 fig, axd = plt.subplot_mosaic([['vals', 'sv'],
                                ['err', 'err'],
-                               ['cum_rew', 'cum_rew'],
+                               ['cum_rew', 'info'],
                                ['eplens', 'info']],
                               gridspec_kw=gs_kw, figsize=figsize,
                               constrained_layout=True)
@@ -150,8 +150,12 @@ ax_err = axd['err']
 ax_eplen = axd['eplens']
 ax_info = axd['info']
 ep_range = np.arange(nb_eps)
-ax_info.plot(ep_range, [lr_fun(ep) for ep in ep_range], c='k', label='LR')
-ax_info.plot(ep_range, [exploration_fun(ep) for ep in ep_range], c='r', ls=':', label='EXP')
+ax_info.plot(ep_range, [exploration_fun(ep) for ep in ep_range], c='r')
+ax_info.yaxis.label.set_color('r')
+ax_info.twinx().plot(ep_range, [lr_fun(ep) for ep in ep_range], c='k')
+ax_info.legend(handles=[plt.Line2D([],[],c='k'), plt.Line2D([],[],c='r')], labels=['LR', 'EXP'])
+ax_info.set_xlabel('Training Episodes')
+info_line = ax_info.axvline(0.0)
 
 nb_heatmaps = 2
 fig.suptitle(f'\n\n{suptitle_suffix}')
@@ -193,17 +197,19 @@ for ep_nb in range(nb_eval_eps):
         ep_lines[i].append(ax.plot([], [], c='m', lw=0.5, label=label_line)[0])
         ep_starting_points[i].append(ax.plot([], [], c='k', marker='o', markersize=2, label=label_point_start)[0])
         ep_terminal_points[i].append(ax.plot([], [], c='r', marker='s', markersize=2, label=label_point_finish)[0])
-for ax in (ax_val, ax_sv):
-    ax.legend(loc='best', prop=dict(size=8))
+# for ax in (ax_val, ax_sv):
+#     ax.legend(loc='best', prop=dict(size=8))
 
 # Create lines
 cum_rew_line, = ax_cum_rew.plot([], [])
 ax_cum_rew.set_ylabel('Total rewards')
+ax_cum_rew.set_xlabel('Time steps')
 cum_rews = []
 
 errors_line1, = ax_err.plot([], [])
 errors_line2, = ax_err.plot([], [])
 ax_err.set_ylabel('TD errors')
+ax_err.set_xlabel('Training episodes')
 errors1 = []
 errors2 = []
 
@@ -213,8 +219,8 @@ ax_eplen.set_xlabel('Time steps')
 ax_eplen.set_ylim((-10, 110))
 eplens = []
 
+
 for ax in (ax_cum_rew, ax_err):
-    ax.set_xlabel('Training episodes')
     ax.set_yscale('symlog')
 
 '''
@@ -250,35 +256,60 @@ def eval():
     temp_eplens = []
     temp_cum_rews = []
     for j in range(nb_eval_eps):
-        state, cum_rews = play_ep_get_obs_and_cumrew()
+        state, cum_rew = play_ep_get_obs_and_cumrew()
         i = 0
         ep_lines[i][j].set_data(state[0], state[1])
         ep_starting_points[i][j].set_data(state[0][0], state[1][0])
         ep_terminal_points[i][j].set_data(state[0][-1], state[1][-1])
 
-        eval_eplens.append(len(state[0]))
+        temp_cum_rews.append(cum_rew)
+        temp_eplens.append(len(state[0]))
 
-    xrange = np.arange(len(eplens)) * eval_every_t_timesteps
-    eplens_line.set_data(xrange, eplens)
+    eplens.append(np.mean(temp_eplens))
+    cum_rews.append(np.mean(temp_cum_rews))
+
+    if len(errors1) > 0:
+        xrange_train = np.arange(len(errors1))
+        for l, daty in zip((errors_line1, errors_line2), (errors1, errors2)):
+            l.set_data(xrange_train, daty)
+            ax_err.set_xlim((0, xrange_train[-1]))
+            ax_err.set_ylim((min(daty), max(daty)))
+
+    info_line.set_xdata(len(errors1))
+
+    xrange_eval = np.arange(len(eplens)) * eval_every_t_timesteps
+    eplens_line.set_data(xrange_eval, eplens)
     ax_eplen.set_xlim((0, T+1))
+    ax_eplen.set_ylim((0, 100))
 
-    # Update cumulative reward plot
-    cum_rews_averaging_window = 1
-    if len(cum_rews) > cum_rews_averaging_window:
-        cum_rews_mean = Series(cum_rews).rolling(cum_rews_averaging_window).mean().to_numpy().tolist()
-        cum_rew_line.set_data(range(len(cum_rews_mean)), cum_rews_mean)
-        ax_cum_rew.set_xlim((0, len(cum_rews_mean)))
-        ax_cum_rew.set_ylim((np.nanmin(cum_rews_mean), np.nanmax(cum_rews_mean)))
+    xrange_eval = np.arange(len(cum_rews)) * eval_every_t_timesteps
+    cum_rew_line.set_data(xrange_eval, cum_rews)
+    ax_cum_rew.set_xlim((0, T+1))
+    ax_cum_rew.set_ylim((min(cum_rews), max(cum_rews)))
 
-    # Update error plot
-    error_averaging_window = 1
-    errors1_mean = Series(errors1).rolling(error_averaging_window).mean().to_numpy().tolist()
-    errors2_mean = Series(errors2).rolling(error_averaging_window).mean().to_numpy().tolist()
-    errors_line1.set_data(range(len(errors1)), errors1_mean)
-    errors_line2.set_data(range(len(errors2)), errors2_mean)
-    if len(errors1) > error_averaging_window and len(errors2) > error_averaging_window:
-        ax_err.set_xlim((0, max([len(errors1), len(errors2)])))
-        ax_err.set_ylim((np.nanmin(errors1_mean + errors2_mean), np.nanmax(errors1_mean + errors2_mean)))
+    # # Update cumulative reward plot
+    # cum_rews_averaging_window = 1
+    # if len(cum_rews) > cum_rews_averaging_window:
+    #     cum_rews_mean = Series(cum_rews).rolling(cum_rews_averaging_window).mean().to_numpy().tolist()
+    #     cum_rew_line.set_data(xrange[-len(cum_rews_mean):], cum_rews_mean)
+    #     ax_cum_rew.set_ylim((np.nanmin(cum_rews_mean), np.nanmax(cum_rews_mean)))
+    #
+    # # Update ep lens plot
+    # eplens_averaging_window = 1
+    # if len(eplens) > eplens_averaging_window:
+    #     eplens_mean = Series(eplens).rolling(eplens_averaging_window).mean().to_numpy().tolist()
+    #     eplens_line.set_data(xrange[-len(eplens_mean):], eplens_mean)
+    #     ax_eplen.set_ylim((np.nanmin(eplens_mean), np.nanmax(eplens_mean)))
+
+    # # Update error plot
+    # error_averaging_window = 1
+    # errors1_mean = Series(errors1).rolling(error_averaging_window).mean().to_numpy().tolist()
+    # errors2_mean = Series(errors2).rolling(error_averaging_window).mean().to_numpy().tolist()
+    # errors_line1.set_data(range(len(errors1)), errors1_mean)
+    # errors_line2.set_data(range(len(errors2)), errors2_mean)
+    # if len(errors1) > error_averaging_window and len(errors2) > error_averaging_window:
+    #     ax_err.set_xlim((0, max([len(errors1), len(errors2)])))
+    #     ax_err.set_ylim((np.nanmin(errors1_mean + errors2_mean), np.nanmax(errors1_mean + errors2_mean)))
     plt.pause(0.1)
 
 
@@ -313,10 +344,10 @@ for ep in trange(nb_eps):
         # Step in environment dynamics
         otp1, r, done, info = env.step(a)
 
-        if step < env.EPISODE_LENGTH_LIMIT - 1 and done:
-            r = 100.
-        else:
-            r = -1.
+        # if step < env.EPISODE_LENGTH_LIMIT - 1 and done:
+        #     r = 100.
+        # else:
+        #     r = -1.
 
         # Calculate targets and update Q-functions
         qvfa, qvfb = swap_q()
