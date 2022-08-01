@@ -1,14 +1,12 @@
-import os
 from itertools import product
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import trange
 from pandas import Series
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
-from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
+from random_env.envs import get_discrete_actions
 from tile_coding_re.heatmap_utils import make_heatmap, update_heatmap
 # from tile_coding_re.training_utils import lr
-from tile_coding_re.buffers import TrajBuffer
 import gym
 
 env = gym.make('MountainCar-v0')

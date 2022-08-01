@@ -56,11 +56,14 @@ class QValueFunctionTiles3:
 
         self.nb_updates = 0
 
-    def get_action_value(self, action):
+    def get_action_index(self, action):
         return self.actions.index(action)
 
-    def value(self, state, action):
-        action_idx = self.get_action_value(action)
+    def value(self, state, action=None):
+        if action is None:
+            action_idx = 0
+        else:
+            action_idx = self.get_action_index(action)
         codings = self.tilings.get_tiling_indices(features=state,
                                                   ints=[action_idx])
         estimate = 0.
@@ -71,7 +74,7 @@ class QValueFunctionTiles3:
     def update(self, state, action, target, lr):
         self.nb_updates += 1
 
-        action_idx = self.get_action_value(action)
+        action_idx = self.get_action_index(action)
         codings = self.tilings.get_tiling_indices(features=state,
                                                   ints=[action_idx])
         error = target - self.value(state, action)

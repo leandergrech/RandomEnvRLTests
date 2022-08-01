@@ -4,14 +4,10 @@ import numpy as np
 from collections import deque
 from pandas import Series
 import matplotlib.pyplot as plt
-from tqdm import trange, tqdm as pbar
+from tqdm import tqdm as pbar
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
 from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
-from tile_coding_re.heatmap_utils import make_heatmap, update_heatmap
-from tile_coding_re.buffers import TrajBuffer
-import gym
 import pickle as pkl
-from datetime import datetime as dt
 
 '''
 Name of RL method used to train agent

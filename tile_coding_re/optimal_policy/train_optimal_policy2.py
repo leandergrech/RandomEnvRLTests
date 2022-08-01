@@ -1,14 +1,11 @@
-import os
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import SymLogNorm
 from tqdm import trange
-import pandas as pd
 from collections import deque
 from itertools import product
 
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
-from tile_coding_re.buffers import TrajBuffer
+from rl_utils.buffers import TrajBuffer
 from tile_coding_re.training_utils import lr, play_ep_get_obs
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
 

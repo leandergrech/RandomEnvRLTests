@@ -1,0 +1,76 @@
+import os
+import gym
+import jax
+import jax.numpy as jnp
+import coax
+import optax
+import haiku as hk
+
+from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
+from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
+
+tensorboard_dir = os.path.join('reinforce')
+
+n_obs, n_act = 2, 2
+actions = get_discrete_actions(n_act, 3)
+
+class REDAX(REDA):
+    def __init__(self, n_obs, n_act, **kwargs):
+        super(REDAX, self).__init__(n_obs, n_act, **kwargs)
+        self.actions = get_discrete_actions(n_act, 3)
+        self.action_space = gym.spaces.Discrete(len(self.actions))
+
+    def step(self, action):
+        return super(REDAX, self).step(self.actions[action])
+
+env = REDAX(n_obs, n_act)
+env = coax.wrappers.TrainMonitor(env, tensorboard_dir=tensorboard_dir, tensorboard_write_all=True)
+
+ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
+tilings = Tilings(nb_tilings=8, nb_bins=2, feature_ranges=ranges, max_tiles=2**20)
+qvf = QValueFunctionTiles3(tilings, actions)
+
+
+def func_pi(S, is_training):
+    seq = hk.Sequential((
+        # hk.Linear(8, w_init=jnp.zeros), jax.nn.relu,
+        # hk.Linear(8, w_init=jnp.zeros), jax.nn.relu,
+        hk.Linear(100, w_init=jnp.zeros), #jax.nn.relu,
+        hk.Linear(len(actions), w_init=jnp.zeros), jax.nn.softmax
+    ))
+    return dict(logits=seq(S))
+
+
+pi = coax.Policy(func_pi, env)
+
+
+# specify how to update policy and value function
+vanilla_pg = coax.policy_objectives.VanillaPG(pi, optimizer=optax.sgd(1e-1))
+
+tracer = coax.reward_tracing.MonteCarlo(gamma=0.9)
+
+for ep in range(1000):
+    o = env.reset()
+    for t in range(env.EPISODE_LENGTH_LIMIT):
+        a, logp = pi(o, return_logp=True)
+        otp1, r, d, _ = env.step(a)
+        tracer.add(o, a, r,d, logp)
+
+        while tracer:
+            batch = tracer.pop()
+            Gn = batch.Rn
+
+            lr = 0.1 * 0.9**(ep//10)
+            err = qvf.update(batch.S[0], actions[0], Gn[0], 0.1/8)
+            env.record_metrics({'qvf/error':err})
+            env.record_metrics({'qvf/lr':lr})
+
+            Gn_pred = qvf.value(batch.S[0])
+
+            Adv = Gn - Gn_pred
+            env.record_metrics({'qvf/abs_Adv': abs(Adv)})
+            metrics = vanilla_pg.update(batch, Adv=Adv)
+            env.record_metrics(metrics)
+
+        if d:
+            break

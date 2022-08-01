@@ -37,11 +37,12 @@ class TrajSimple:
 
 
 class TrajBuffer:
-    def __init__(self):
+    def __init__(self, discount=1.0):
         self.o_ = None
         self.a_ = None
         self.r_ = None
         self.g_ = None
+        self.discount = discount
         self.reset()
 
     def reset(self):
@@ -67,9 +68,17 @@ class TrajBuffer:
     def get_returns(self):
         return np.flip(np.cumsum(np.flip(self.r_))).tolist()
 
+    def calculate_returns(self, gamma=1.0):
+        r = self.r_
+        N = len(r)
+        gammas = [gamma**item for item in range(N)]
+
+        self.g_ = [np.sum(np.multiply(r[i:], gammas[:N-i])) for i in range(N)]
+
+
     def pop_target_tuple(self):
         if not self.g_:
-            self.g_ = self.get_returns()
+            self.calculate_returns(self.discount)
 
         if not self.o_:
             raise ValueError('No items in buffer')

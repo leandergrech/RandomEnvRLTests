@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tile_coding_re.buffers import TrajBuffer
+from rl_utils.buffers import TrajBuffer
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
 
 env = RandomEnvDiscreteActions(2, 2)
