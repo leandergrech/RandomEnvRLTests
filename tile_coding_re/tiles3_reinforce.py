@@ -1,4 +1,6 @@
 import os
+from copy import deepcopy
+import numpy as np
 import gym
 import jax
 import jax.numpy as jnp
@@ -24,6 +26,7 @@ class REDAX(REDA):
         return super(REDAX, self).step(self.actions[action])
 
 env = REDAX(n_obs, n_act)
+eval_env = deepcopy(env)
 env = coax.wrappers.TrainMonitor(env, tensorboard_dir=tensorboard_dir, tensorboard_write_all=True)
 
 ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
@@ -33,9 +36,9 @@ qvf = QValueFunctionTiles3(tilings, actions)
 
 def func_pi(S, is_training):
     seq = hk.Sequential((
-        # hk.Linear(8, w_init=jnp.zeros), jax.nn.relu,
-        # hk.Linear(8, w_init=jnp.zeros), jax.nn.relu,
-        hk.Linear(100, w_init=jnp.zeros), #jax.nn.relu,
+        hk.Linear(8, w_init=jnp.zeros), jax.nn.relu,
+        hk.Linear(8, w_init=jnp.zeros), jax.nn.relu,
+        hk.Linear(8, w_init=jnp.zeros), jax.nn.relu,
         hk.Linear(len(actions), w_init=jnp.zeros), jax.nn.softmax
     ))
     return dict(logits=seq(S))
@@ -45,9 +48,11 @@ pi = coax.Policy(func_pi, env)
 
 
 # specify how to update policy and value function
-vanilla_pg = coax.policy_objectives.VanillaPG(pi, optimizer=optax.sgd(1e-1))
+vanilla_pg = coax.policy_objectives.VanillaPG(pi, optimizer=optax.adam(1e-2))
 
 tracer = coax.reward_tracing.MonteCarlo(gamma=0.9)
+
+eval_every = 1000
 
 for ep in range(1000):
     o = env.reset()
@@ -55,6 +60,20 @@ for ep in range(1000):
         a, logp = pi(o, return_logp=True)
         otp1, r, d, _ = env.step(a)
         tracer.add(o, a, r,d, logp)
+
+        if (env.T+1) % eval_every == 0:
+            eplens = []
+            for _ in range(20):
+                o_eval = eval_env.reset()
+                d_eval = False
+                step = 0
+                while not d_eval:
+                    a_eval = pi(o_eval)
+                    otp1_eval, r_eval, d_eval, _ = eval_env.step(a_eval)
+                    o_eval = otp1_eval.copy()
+                    step += 1
+                eplens.append(step)
+            env.record_metrics({'episode/eplens':np.mean(eplens)})
 
         while tracer:
             batch = tracer.pop()
