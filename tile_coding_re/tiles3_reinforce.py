@@ -9,21 +9,12 @@ import optax
 import haiku as hk
 
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
-from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
+from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions, REDAX
 
 tensorboard_dir = os.path.join('reinforce')
 
 n_obs, n_act = 2, 2
 actions = get_discrete_actions(n_act, 3)
-
-class REDAX(REDA):
-    def __init__(self, n_obs, n_act, **kwargs):
-        super(REDAX, self).__init__(n_obs, n_act, **kwargs)
-        self.actions = get_discrete_actions(n_act, 3)
-        self.action_space = gym.spaces.Discrete(len(self.actions))
-
-    def step(self, action):
-        return super(REDAX, self).step(self.actions[action])
 
 env = REDAX(n_obs, n_act)
 eval_env = deepcopy(env)

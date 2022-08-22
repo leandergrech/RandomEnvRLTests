@@ -86,6 +86,16 @@ class RandomEnvDiscreteActions(RandomEnv):
         return self.cum_action
 
 
+class REDAX(RandomEnvDiscreteActions):
+    def __init__(self, n_obs, n_act, **kwargs):
+        super(REDAX, self).__init__(n_obs, n_act, **kwargs)
+        self.actions = get_discrete_actions(n_act, 3)
+        self.action_space = gym.spaces.Discrete(len(self.actions))
+
+    def step(self, action):
+        return super(REDAX, self).step(self.actions[action])
+
+
 class VREDA(RandomEnvDiscreteActions):
     def __init__(self, *args, **kwargs):
         super(VREDA, self).__init__(*args, **kwargs)

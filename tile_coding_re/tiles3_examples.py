@@ -1,10 +1,8 @@
-from numpy import min as npmin, max as npmax, linspace, pi, sign
-from numpy.random import randn, choice, rand
-import matplotlib.pyplot as plt
-from tiles3 import tiles, IHT, tilesclip, tilesasymmetric
+from numpy import linspace
+from numpy.random import randn
+from tiles3 import tiles, IHT, tilesasymmetric
 from heatmap_utils import *
 from training_utils import lr
-from math import cos, sin, sqrt
 
 
 def actual_func(x, y):

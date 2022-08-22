@@ -1,5 +1,5 @@
-from numpy.random import rand
-from collections.abc import Generator
+import os
+import pickle as pkl
 from tile_coding_re.tiles3 import IHT, tiles, tilesclip
 
 
@@ -41,29 +41,22 @@ def argmax(arr):
 
 
 class QValueFunctionTiles3:
-    def __init__(self, tilings: Tilings, actions: list):#, lr: Generator[float, None, None]):
+    def __init__(self, tilings: Tilings, n_discrete_actions):#, lr: Generator[float, None, None]):
         """
         param tilings: Tiling instance
         param actions: List of all possible discrete actions
         param lr: Generator that yields learning rate
         """
         self.tilings = tilings
-        self.actions = actions
+        self.n_discrete_actions = n_discrete_actions
         # self.lr = lambda: next(lr) / len(tilings)
-        init_q_val = -2.0
+        init_q_val = 0.0
         self.q_table = [init_q_val for _ in range(tilings.max_tiles)]
         # self.q_table = [-rand() for _ in range(tilings.max_tiles)]
 
         self.nb_updates = 0
 
-    def get_action_index(self, action):
-        return self.actions.index(action)
-
-    def value(self, state, action=None):
-        if action is None:
-            action_idx = 0
-        else:
-            action_idx = self.get_action_index(action)
+    def value(self, state, action_idx=0):
         codings = self.tilings.get_tiling_indices(features=state,
                                                   ints=[action_idx])
         estimate = 0.
@@ -71,21 +64,46 @@ class QValueFunctionTiles3:
             estimate += self.q_table[coding]
         return estimate / len(self.tilings)
 
-    def update(self, state, action, target, lr):
+    def update(self, state, action_idx, target, lr):
         self.nb_updates += 1
 
-        action_idx = self.get_action_index(action)
         codings = self.tilings.get_tiling_indices(features=state,
                                                   ints=[action_idx])
-        error = target - self.value(state, action)
+        error = target - self.value(state, action_idx)
+
         # alpha = self.lr()/len(self.tilings)
-        # alpha = lr / len(self.tilings)
-        alpha = lr
+        alpha = lr / self.tilings.nb_tilings
+
         for coding in codings:
             self.q_table[coding] += alpha * error
         return error
 
     def greedy_action(self, state, verbose=False):
         if verbose: print(self.nb_updates)
-        action_idx = argmax([self.value(state, a_) for a_ in self.actions])
-        return self.actions[action_idx]
+        action_idx = argmax([self.value(state, a_) for a_ in range(self.n_discrete_actions)])
+        return action_idx
+
+    def count(self):
+        return self.tilings.count()
+
+
+    def save(self, save_path):
+        with open(save_path, 'wb') as  f:
+            pkl.dump(dict(
+                q_table=self.q_table[:self.count()],
+                tilings=self.tilings,
+                n_discrete_actions=self.n_discrete_actions))
+
+    @staticmethod
+    def load(load_path):
+        if os.path.exists(load_path):
+            with open(load_path, 'rb') as f:
+                d = pkl.load(f)
+                tilings = d['tilings']
+                n_discrete_actions = d['n_discrete_actions']
+                self = QValueFunctionTiles3(tilings, n_discrete_actions)
+                self.q_table[:tilings.count()] = d['q_table']
+                return self
+
+        else:
+            raise FileNotFoundError(f'Path passed: {load_path}, does not exist.')
