@@ -5,6 +5,18 @@ def init_label(label):
     else:
         return ''
 
+
+class CustomFunc:
+    def __init__(self):
+        self.pow = 0.75
+
+    def __call__(self, ep_idx):
+        return 1/((ep_idx + 1) ** self.pow)
+
+    def __repr__(self):
+        return f'1/((ep_idx + 1) ** {self.pow}'
+
+
 class Constant:
     def __init__(self, val, label=''):
         self.val = val
@@ -57,7 +69,15 @@ class StepDecay:
     def __repr__(self):
         return f'{self.label}StepDecay_init-{self.init}_decayrate-{self.decay_rate}_decayevery-{self.decay_every}'
 
+def customFunc_representer(dumper, fun):
+    return dumper.represent_mapping("!CustomFunc", {
+        "func": repr(fun)
+    })
 
+def constant_representer(dumper, fun):
+    return dumper.represent_mapping("!Constant", {
+        "val": fun.val
+    })
 def exponentialDecay_representer(dumper: yaml.SafeDumper, fun: ExponentialDecay) -> yaml.nodes.MappingNode:
     return dumper.represent_mapping("!ExponentialDecay", {
         "init": fun.init,
@@ -85,6 +105,8 @@ def stepDecay_representer(dumper: yaml.SafeDumper, fun: StepDecay) -> yaml.nodes
 
 def get_training_utils_yaml_dumper():
     safe_dumper = yaml.SafeDumper
+    safe_dumper.add_representer(CustomFunc, customFunc_representer)
+    safe_dumper.add_representer(Constant, constant_representer)
     safe_dumper.add_representer(ExponentialDecay, exponentialDecay_representer)
     safe_dumper.add_representer(LinearDecay, linearDecay_representer)
     safe_dumper.add_representer(StepDecay, stepDecay_representer)

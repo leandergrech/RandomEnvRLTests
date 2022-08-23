@@ -50,7 +50,7 @@ class QValueFunctionTiles3:
         self.tilings = tilings
         self.n_discrete_actions = n_discrete_actions
         # self.lr = lambda: next(lr) / len(tilings)
-        init_q_val = 0.0
+        init_q_val = 2.0
         self.q_table = [init_q_val for _ in range(tilings.max_tiles)]
         # self.q_table = [-rand() for _ in range(tilings.max_tiles)]
 
@@ -80,7 +80,8 @@ class QValueFunctionTiles3:
 
     def greedy_action(self, state, verbose=False):
         if verbose: print(self.nb_updates)
-        action_idx = argmax([self.value(state, a_) for a_ in range(self.n_discrete_actions)])
+        vals = [self.value(state, a_) for a_ in range(self.n_discrete_actions)]
+        action_idx = argmax(vals)
         return action_idx
 
     def count(self):

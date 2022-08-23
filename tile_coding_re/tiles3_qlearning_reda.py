@@ -13,9 +13,10 @@ Environment info
 '''
 n_obs = 2
 n_act = 2
-env = REDA(n_obs, n_act, estimate_scaling=False)
-env.TRIM_FACTOR = 2.
-env.load_dynamics('env_dynamics')
+env = REDA(n_obs, n_act, estimate_scaling=True)
+# env.TRIM_FACTOR = 2.
+# env.load_dynamics('env_dynamics')
+
 # env = REDA(n_obs, n_act)
 # eval_env = VREDA(n_obs, n_act, model_info=env.model_info)
 eval_env = deepcopy(env)
@@ -34,6 +35,7 @@ max_tiles = 2 ** 20
 
 tilings = Tilings(nb_tilings, nb_bins, ranges, max_tiles)
 actions = get_discrete_actions(n_act, 3)
+n_discrete_actions = len(actions)
 
 '''
 Hyper parameters
@@ -63,8 +65,8 @@ ep = 0
 '''
 Q-function tables and training methods
 '''
-qvf1 = QValueFunctionTiles3(tilings, actions)#, lr)
-qvf2 = QValueFunctionTiles3(tilings, actions)#, lr)
+qvf1 = QValueFunctionTiles3(tilings, n_discrete_actions)#, lr)
+qvf2 = QValueFunctionTiles3(tilings, n_discrete_actions)#, lr)
 
 
 def swap_q():
@@ -75,7 +77,7 @@ def swap_q():
 
 
 def get_qvals(state, qvf):
-    return [qvf.value(state, a_) for a_ in actions]
+    return [qvf.value(state, a_) for a_ in range(n_discrete_actions)]
 
 
 def get_total_greedy_action(state):
@@ -85,7 +87,7 @@ def get_total_greedy_action(state):
     tot_val = [v1 + v2 for v1, v2 in zip(val1, val2)]
     action_idx = np.argmax(tot_val)
 
-    return actions[action_idx]
+    return action_idx
 
 
 def play_ep_get_obs_and_cumrew():
@@ -95,7 +97,7 @@ def play_ep_get_obs_and_cumrew():
     _d = False
     while not _d:
         a = get_total_greedy_action(o)
-        otp1, r, _d, _ = eval_env.step(a)
+        otp1, r, _d, _ = eval_env.step(actions[a])
 
         cumrew += r
 
@@ -333,12 +335,12 @@ for ep in trange(nb_eps):
         # Explore or exploit
         exploration = exploration_fun(ep)
         if np.random.rand() < exploration:
-            a = env.action_space.sample().tolist()
+            a = np.random.choice(n_discrete_actions)
         else:
             a = get_total_greedy_action(o)
 
         # Step in environment dynamics
-        otp1, r, done, info = env.step(a)
+        otp1, r, done, info = env.step(actions[a])
 
         # if step < env.EPISODE_LENGTH_LIMIT - 1 and done:
         #     r = 100.

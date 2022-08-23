@@ -66,6 +66,13 @@ def train_instance(**kwargs):
 
     results_path = kwargs.get('results_path')
 
+    def get_action(t):
+        if np.random.rand() < exp_fun(t):
+            a = np.random.choice(n_actions)
+        else:
+            a = q.greedy_action(o)
+        return a
+
     '''
     TRAINING LOOP
     '''
@@ -74,14 +81,12 @@ def train_instance(**kwargs):
     iht_counts = []
     lrs = []
     ep_idx = 0
+    a = get_action(0)
     for T in trange(nb_training_steps):
-        if np.random.rand() < exp_fun(T):
-            a = np.random.choice(n_actions)
-        else:
-            a = q.greedy_action(o)
         otp1, r, d, _ = env.step(actions[a])
+        a_ = q.greedy_action(otp1)
 
-        target = r + gamma * q.value(otp1, q.greedy_action(otp1))
+        target = r + gamma * q.value(otp1, a_)
 
         # td_errors[T] = q.update(o, a, target, lr_fun(T))
         lr = lr_fun(ep_idx)
@@ -91,10 +96,12 @@ def train_instance(**kwargs):
         if d:
             t = 0
             o = env.reset()
+            a = get_action(t)
             ep_idx += 1
         else:
             t += 1
             o = otp1
+            a = a_
 
         if (T + 1) % eval_every == 0:
             init_obses, terminal_obses, mean_ep_len = eval_agent(eval_env, q)
