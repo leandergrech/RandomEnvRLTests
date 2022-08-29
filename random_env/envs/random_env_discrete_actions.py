@@ -77,7 +77,8 @@ class RandomEnvDiscreteActions(RandomEnv):
 
     def get_optimal_action(self, state, state_clip=None):
         opt_action = super(RandomEnvDiscreteActions, self).get_optimal_action(state, state_clip)
-        delta_action = opt_action - self.get_actual_actions()
+        # delta_action = opt_action - self.get_actual_actions()
+        delta_action = opt_action
         discrete_action = np.sign(np.where(abs(delta_action) < self.ACTION_EPS,
                                 np.zeros_like(delta_action), delta_action)) + 1
         return discrete_action.astype(int).tolist()

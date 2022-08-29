@@ -132,7 +132,8 @@ class RandomEnv(Env):
             state = np.clip(state, -state_clip, state_clip)
 
         # PI controller
-        error = np.multiply(self.K_p, state) + np.multiply(self.K_i, self.prev_state)
+        # error = np.multiply(self.K_p, state) + np.multiply(self.K_i, self.prev_state)
+        error = state
         action = -self.pi.dot(error)
         if self.act_dimension == 1:
             action = np.array([action])

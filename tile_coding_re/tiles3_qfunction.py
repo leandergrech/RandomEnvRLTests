@@ -78,6 +78,11 @@ class QValueFunctionTiles3:
             self.q_table[coding] += alpha * error
         return error
 
+    def set(self, state, action_idx, val):
+        codings = self.tilings.get_tiling_indices(features=state, ints=[action_idx])
+        for coding in codings:
+            self.q_table[coding] = val
+
     def greedy_action(self, state, verbose=False):
         if verbose: print(self.nb_updates)
         vals = [self.value(state, a_) for a_ in range(self.n_discrete_actions)]
