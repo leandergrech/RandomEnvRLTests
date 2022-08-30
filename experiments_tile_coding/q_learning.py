@@ -97,8 +97,8 @@ def train_instance(**kwargs):
             o = otp1
 
         if (T + 1) % eval_every == 0:
-            init_obses, terminal_obses, mean_ep_len = eval_agent(eval_env, q)
-            eval_ep_lens.append(mean_ep_len)
+            init_obses, terminal_obses, ep_len_stats = eval_agent(eval_env, q, nb_eps=kwargs.get('eval_eps'))
+            eval_ep_lens.append(ep_len_stats)
             iht_counts.append(tilings.count())
             make_state_violins(init_obses, terminal_obses, os.path.join(results_path, 'obses_violins', f'step-{T}.png'))
 
@@ -106,6 +106,9 @@ def train_instance(**kwargs):
 
 
 if __name__ == '__main__':
+    seed = 123
+    np.random.seed(seed)
+
     experiment_dir = dt.now().strftime('%m%d%y_%H%M%S')
     os.makedirs(experiment_dir)
 
@@ -113,20 +116,22 @@ if __name__ == '__main__':
     # exp_fun = ExponentialDecay(1.0, 1000)
     # lr_fun = StepDecay(init=1e-2, decay_rate=.99, decay_every=1000)
     # exp_fun = StepDecay(init=1.0, decay_rate=.85, decay_every=1000)
-    lr_fun = CustomFunc()
+    # lr_fun = CustomFunc()
+    lr_fun = Constant(1e-2)
     exp_fun = Constant(0.1)
 
     train_params = dict(
         n_obs=2,
         n_act=2,
-        nb_tilings=16,
+        nb_tilings=8,
         nb_bins=2,
         env_save_path=experiment_dir,
         results_path=experiment_dir,
         lr_fun=lr_fun,
         exp_fun=exp_fun,
         nb_training_steps=10000,
-        eval_every=1000,
+        eval_every=500,
+        eval_eps=20,
         gamma=0.99
     )
     with open(os.path.join(experiment_dir, "train_params.yml"), "w") as f:
@@ -134,12 +139,18 @@ if __name__ == '__main__':
 
     errors, eval_ep_lens, iht_counts, lrs = train_instance(**train_params)
 
+    el_means = [item['mean'] for item in eval_ep_lens]
+    el_mins = [item['min'] for item in eval_ep_lens]
+    el_maxs = [item['max'] for item in eval_ep_lens]
+
     fig, axs = plt.subplots(4, 1, gridspec_kw=dict(height_ratios=[3, 3, 3, 3]))
     xrange = np.arange(len(errors))
-    eval_xrange = np.linspace(0, train_params['nb_training_steps'], len(eval_ep_lens))
+    eval_xrange = np.linspace(0, train_params['nb_training_steps'], len(el_means))
     axs[0].plot(xrange, errors)
     axs[0].set_ylabel('TD error')
-    axs[1].plot(eval_xrange, eval_ep_lens)
+    axs[1].plot(eval_xrange, el_mins, ls=':')
+    axs[1].plot(eval_xrange, el_maxs, ls=':')
+    axs[1].plot(eval_xrange, el_means)
     axs[1].set_ylabel('Eval ep lens')
     axs[2].plot(eval_xrange, iht_counts)
     axs[2].set_ylabel('Nb tiles')

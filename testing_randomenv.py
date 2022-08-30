@@ -64,7 +64,22 @@ def quick_testing_randomenv():
     # 	a.legend(loc='best')
     plt.show()
 
+def testing_state_initialisation_schemes():
+    n_obs = 2
+    nb_samples = 1000
+
+    random_sign = lambda: [-1,1][np.random.choice(2)]
+    fig, ax = plt.subplots()
+    for _ in range(nb_samples):
+        r = np.random.normal(0.8, 0.1)
+        theta = 2 * np.pi * np.random.rand()
+        init_state = np.array([r*np.cos(theta), r*np.sin(theta)])
+        ax.scatter(init_state[0], init_state[1], marker='x', c='k')
+
+    plt.show()
+
 
 if __name__ == '__main__':
     # quick_testing_randomenv()
-    env = RandomEnv.load_from_dir('common_envs')
+    # env = RandomEnv.load_from_dir('common_envs')
+    testing_state_initialisation_schemes()

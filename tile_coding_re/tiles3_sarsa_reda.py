@@ -71,29 +71,15 @@ ep = 0
 '''
 Q-function tables and training methods
 '''
-qvf1 = QValueFunctionTiles3(tilings, n_discrete_actions)#, lr)
-qvf2 = QValueFunctionTiles3(tilings, n_discrete_actions)#, lr)
+qvf = QValueFunctionTiles3(tilings, n_discrete_actions)#, lr)
 
 
-def swap_q():
-    if np.random.rand() < 0.5:
-        return qvf1, qvf2
-    else:
-        return qvf2, qvf1
-
-
-def get_qvals(state, qvf):
+def get_qvals(state):
     return [qvf.value(state, a_) for a_ in range(n_discrete_actions)]
 
 
-def get_total_greedy_action(state):
-    global actions, qvf1, qvf2
-    val1 = get_qvals(state, qvf1)
-    val2 = get_qvals(state, qvf2)
-    tot_val = [v1 + v2 for v1, v2 in zip(val1, val2)]
-    action_idx = np.argmax(tot_val)
-
-    return action_idx
+def get_greedy_action(state):
+    return qvf.greedy_action(state)
 
 
 def play_ep_get_obs_and_cumrew():
@@ -102,7 +88,7 @@ def play_ep_get_obs_and_cumrew():
     o = eval_env.reset()
     _d = False
     while not _d:
-        a = get_total_greedy_action(o)
+        a = get_greedy_action(o)
         otp1, r, _d, _ = eval_env.step(actions[a])
 
         cumrew += r
@@ -215,7 +201,6 @@ errors_line2, = ax_err.plot([], [])
 ax_err.set_ylabel('TD errors')
 ax_err.set_xlabel('Training episodes')
 errors1 = []
-errors2 = []
 
 eplens_line, = ax_eplen.plot([], [])
 ax_eplen.set_ylabel('Ep. lens')
@@ -233,12 +218,14 @@ Evaluation info
 is_eval = lambda: (T + 1) % eval_every_t_timesteps == 0 or T == 0
 lr, exploration = None, None
 
+
 def update_line(l, v, x=None):
     if x is None:
         x = range(len(v))
     l.set_data(x, v)
     l.set_ylim((np.nanmin(v), np.nanmax(v)))
     l.set_xlim((x[0], x[-1]))
+
 
 def eval():
     fig.suptitle(f'Episode {ep+1:4d} - Step {T+1:4d}\nIHT count {tilings.count():6d}\n'
@@ -249,7 +236,7 @@ def eval():
         vals = []
         for vel in np.linspace(0.0, 0.15, 5):
             ts = np.concatenate([ts, [vel]])
-            vals.append(max([(v1 + v2)/2. for v1, v2 in zip(get_qvals(ts, qvf1), get_qvals(ts, qvf2))]))
+            vals.append(max([v for v in get_qvals(ts)]))
         tracked_vals[j] = np.mean(vals)
     update_heatmap(im_val, reshape_to_map(tracked_vals))
 
@@ -274,10 +261,9 @@ def eval():
 
     if len(errors1) > 0:
         xrange_train = np.arange(len(errors1))
-        for l, daty in zip((errors_line1, errors_line2), (errors1, errors2)):
-            l.set_data(xrange_train, daty)
-            ax_err.set_xlim((0, xrange_train[-1]))
-            ax_err.set_ylim((min(daty), max(daty)))
+        errors_line1.set_data(xrange_train, errors1)
+        ax_err.set_xlim((0, xrange_train[-1]))
+        ax_err.set_ylim((min(errors1), max(errors1)))
 
     info_line.set_xdata(len(errors1))
 
@@ -335,23 +321,25 @@ def obs_init_func():
     theta = 2 * np.pi * np.random.rand()
     return np.array([r * np.cos(theta), r * np.sin(theta)])
 
+
 for ep in trange(nb_eps):
     o = env.reset(obs_init_func())
+    a = get_greedy_action(o)
     done = False
     cum_rew = 0.0
 
-    err1, err2 = 0.0, 0.0
+    err1 = 0.0
     step = 0
     while not done:
+        # Step in environment dynamics
+        otp1, r, done, info = env.step(actions[a])
+
         # Explore or exploit
         exploration = exploration_fun(ep)
         if np.random.rand() < exploration:
-            a = np.random.choice(n_discrete_actions)
+            a_ = np.random.choice(n_discrete_actions)
         else:
-            a = get_total_greedy_action(o)
-
-        # Step in environment dynamics
-        otp1, r, done, info = env.step(actions[a])
+            a_ = get_greedy_action(o)
 
         # if step < env.EPISODE_LENGTH_LIMIT - 1 and done:
         #     r = 100.
@@ -359,11 +347,10 @@ for ep in trange(nb_eps):
         #     r = -1.
 
         # Calculate targets and update Q-functions
-        qvfa, qvfb = swap_q()
-        target = r + gamma * qvfb.value(otp1, qvfa.greedy_action(otp1))
+        target = r + gamma * qvf.value(otp1, a_)
 
         lr = lr_fun(ep)
-        error = qvfa.update(o, a, target, lr)
+        error = qvf.update(o, a, target, lr)
 
         # Increment cumulative reward
         cum_rew += r
@@ -372,13 +359,11 @@ for ep in trange(nb_eps):
         update_state_visitations(o)
 
         # Log errors for plotting
-        if qvfa == qvf1:
-            err1 += error
-        else:
-            err2 += error
+        err1 += error
 
         # Cycle variables and increment counters
         o = otp1.copy()
+        a = a_
         T += 1
         step += 1
 
@@ -387,7 +372,6 @@ for ep in trange(nb_eps):
             eval()
     cum_rews.append(cum_rew)
     errors1.append(err1)
-    errors2.append(err2)
 
 plt.ioff()
 # plt.savefig(os.path.join('results', f'doubleQLearning_mountainCar_{nb_tilings}Tilings_{nb_bins}Bins.png'))

@@ -120,8 +120,9 @@ class RandomEnv(Env):
     def _is_done(self):
         done, success = False, False
         # Reach goal
+        state_mag = np.sqrt(np.sum(np.square(self.current_state)))
         if len(self.reward_deque) >= RandomEnv.REWARD_DEQUE_SIZE and \
-                np.max(np.abs(self.current_state)) <= self.GOAL:
+                state_mag <= self.GOAL:
             done, success = True, True
         elif self._it >= self.EPISODE_LENGTH_LIMIT - 1:
             done = True

@@ -6,8 +6,7 @@ import seaborn as sns
 from random_env.envs import get_discrete_actions
 
 
-def eval_agent(eval_env, q):
-    nb_eps = 100
+def eval_agent(eval_env, q, nb_eps):
     init_obses = np.empty(shape=(0, eval_env.obs_dimension))
     terminal_obses = np.empty(shape=(0, eval_env.obs_dimension))
     ep_lens = []
@@ -27,7 +26,8 @@ def eval_agent(eval_env, q):
         terminal_obses = np.vstack([terminal_obses, o])
         ep_lens.append(t)
 
-    return init_obses, terminal_obses, np.mean(ep_lens)
+    ep_len_stats = dict(median=np.median(ep_lens), min=min(ep_lens), max=max(ep_lens))
+    return init_obses, terminal_obses, ep_len_stats
 
 
 def make_state_violins(init_obses, terminal_obses, path):

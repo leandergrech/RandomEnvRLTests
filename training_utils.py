@@ -26,7 +26,7 @@ class Constant:
         return self.val
 
     def __repr__(self):
-        return f'{self.label}{self.val}'
+        return f'{self.label}Constant_{self.val}'
 
 
 class ExponentialDecay:

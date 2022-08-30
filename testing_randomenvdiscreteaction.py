@@ -1,16 +1,17 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from collections import defaultdict
 from tqdm import trange
-from random_env.envs import RandomEnvDiscreteActions, VREDA
+from random_env.envs import RandomEnvDiscreteActions as REDA, VREDA, get_discrete_actions
 
 
 def quick_testing_randomenvdiscreteactions():
     n_obs = 5
     n_act = 5
 
-    env = RandomEnvDiscreteActions(n_obs, n_act)
+    env = REDA(n_obs, n_act)
 
     record = defaultdict(list)
 
@@ -176,7 +177,84 @@ def vreda_diagnostic_plots():
 
     plt.show()
 
+
+def testing_reda_trims():
+    n_obs, n_act = 2, 2
+    n_envs = 5
+
+    actions = get_discrete_actions(n_act, 3)
+    n_actions = len(actions)
+
+    init_state = np.zeros(n_obs)
+
+    cmap = mpl.cm.get_cmap('jet')
+    fig, ax = plt.subplots()
+    # ax.set_facecolor('grey')
+    for i, c in enumerate(np.linspace(0, 1, n_envs)):
+        env = REDA(n_obs, n_act, estimate_scaling=False)
+        env.ACTION_EPS = 0.1
+        if i == 0:
+            thresh = ax.add_patch(plt.Circle((0.,0.), env.GOAL, facecolor='None', edgecolor='g', ls='--'))
+            thresh2 = ax.add_patch(plt.Circle((0.,0.), 2*env.GOAL, facecolor='None', edgecolor='g', ls=':'))
+        for j, a in enumerate(actions):
+            if a == np.ones(n_act).tolist():
+                continue
+            env.reset(init_state.copy())
+            otp1, *_ = env.step(a)
+            label = f'Env {i}' if j == 0 else None
+            text_pos = otp1 + 0.2*otp1
+            text_align = 'top' if otp1[1] > 0 else 'bottom'
+            ax.text(*text_pos, f'{a}', size=8, c=cmap(c), verticalalignment=text_align)
+            ax.plot(*np.vstack([init_state, otp1]).T, c=cmap(c), marker='x', label=label)
+    h, l = ax.get_legend_handles_labels()
+    plt.legend(handles=h+[thresh, thresh2], labels=l+['Threshold', 'Threshold x2'], loc='best')
+
+    ax.set_title('REDA unit trims fixed by random linear dynamics')
+    ax.set_xlabel('State dimension 0')
+    ax.set_ylabel('State dimension 1')
+
+    fig.tight_layout()
+
+    plt.show()
+
+
+def testing_reda_optimal_policy():
+    n_obs, n_act = 2, 2
+    env = REDA(n_obs, n_act)
+    nb_eps = 30
+    def init_state(ep):
+        r = np.random.normal(0.8, 0.1)
+        theta = 2 * np.pi * (ep/nb_eps)#np.random.rand()
+        return np.array([r * np.cos(theta), r * np.sin(theta)])
+
+    cmap = mpl.cm.get_cmap('hsv')
+    fig, ax = plt.subplots()
+    ax.add_patch(plt.Circle((0, 0), env.GOAL, edgecolor='g', facecolor='None', ls='--', label='Threshold', zorder=20, lw=1.5))
+    for ep, c in enumerate(np.linspace(0, 1, nb_eps)):
+        o = env.reset(init_state(ep))
+        d = False
+        obses = [o.copy()]
+        label = 'Initial state' if ep == 0 else None
+        ax.scatter(o[0],o[1], marker='o', c='k', label=label, zorder=15)
+        while not d:
+            otp1, _, d, _ = env.step(env.get_optimal_action(o))
+            obses.append(otp1.copy())
+            o = otp1
+        obses = np.array(obses).T
+        label = 'Terminal state' if ep == 0 else None
+        ax.scatter(o[0], o[1], marker='*', c='k', label=label, zorder=15)
+        ax.plot(obses[0], obses[1], c=cmap(c), marker='x', zorder=10)
+    ax.set_title(f'{repr(env)}\n'
+                 f'Optimal policy derived from linear dynamics')
+    plt.legend(loc='best')
+    fig.tight_layout()
+    plt.show()
+
+
+
 if __name__ == '__main__':
     # testing_vreda_velocities()
     # testing_vreda_eplens()
-    vreda_diagnostic_plots()
+    # vreda_diagnostic_plots()
+    # testing_reda_trims()
+    testing_reda_optimal_policy()
