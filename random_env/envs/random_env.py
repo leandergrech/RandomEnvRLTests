@@ -238,13 +238,13 @@ class RandomEnv(Env):
             raise FileNotFoundError(
                 f'Directory passed: {load_dir}, does not contain dynamics for a {self.__repr__()} envirnment.')
 
-    @staticmethod
-    def load_from_dir(load_dir):
+    @classmethod
+    def load_from_dir(cls, load_dir):
         for file in os.listdir(load_dir):
             if RandomEnv.SAVED_MODEL_SUFFIX in file:
                 n_obs, n_act = re.findall(r'\d+', file)
                 n_obs, n_act = int(n_obs), int(n_act)
-                self = RandomEnv(n_obs, n_act, estimate_scaling=False)
+                self = cls(n_obs, n_act, estimate_scaling=False)
                 self.load_dynamics(load_dir)
 
                 return self

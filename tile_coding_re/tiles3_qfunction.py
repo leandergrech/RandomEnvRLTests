@@ -98,7 +98,7 @@ class QValueFunctionTiles3:
             pkl.dump(dict(
                 q_table=self.q_table[:self.count()],
                 tilings=self.tilings,
-                n_discrete_actions=self.n_discrete_actions))
+                n_discrete_actions=self.n_discrete_actions), f)
 
     @staticmethod
     def load(load_path):

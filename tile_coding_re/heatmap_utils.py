@@ -10,9 +10,9 @@ def make_heatmap(ax, z, x, y, title=None):
     xmin, xmax = get_min_and_max(x)
     ymin, ymax = get_min_and_max(y)
 
-    im = ax.matshow(z, extent=(xmin, xmax, ymin, ymax), aspect='auto', origin='lower')
-    ax.axvline(0.0, c='w')
-    ax.axhline(0.0, c='w')
+    im = ax.matshow(z, extent=(xmin, xmax, ymin, ymax), aspect='auto', origin='lower', cmap='jet', zorder=5)
+    ax.axvline(0.0, c='w', zorder=15)
+    ax.axhline(0.0, c='w', zorder=15)
     plt.colorbar(im, ax=ax, orientation='horizontal')
     if title is not None:
         im.axes.set_title(title)
