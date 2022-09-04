@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pickle as pkl
 from tqdm import tqdm as pbar
-from  tile_coding_re.tiles3_qfunction import QValueFunctionTiles3
+from tile_coding_re.tiles3_qfunction import QValueFunctionTiles3
 from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA, get_discrete_actions
 
 def get_latest_experiment():
@@ -157,6 +157,7 @@ def plot_q_vals_region_sampling_tracking_states():
     plt.show()
 
 from tile_coding_re.heatmap_utils import make_heatmap
+from experiments_tile_coding.eval_utils import play_episode
 def plot_individual_action_qvals():
     experiment_dir = get_latest_experiment()
     experiment_name = os.path.split(experiment_dir)
@@ -171,7 +172,7 @@ def plot_individual_action_qvals():
     # qs = [QValueFunctionTiles3.load(item) for item in q_func_filenames]
     nb_q_funcs = len(q_func_filenames)
 
-    query_training_step = 100000-1
+    query_training_step = 80000-1
     qfn_at_step = q_func_filenames[np.searchsorted(training_steps, query_training_step)]
     at_training_step = get_q_func_step(qfn_at_step)
 
@@ -185,6 +186,18 @@ def plot_individual_action_qvals():
     nb_tracked = len(tracking_states)
 
     q = QValueFunctionTiles3.load(qfn_at_step)
+
+    nb_test_eps = 1000
+    test_obses = []
+    test_acts = []
+    for _ in range(nb_test_eps):
+        obses, acts, _ = play_episode(env, q, circular_uniform_sample(0.8, 0.9))
+        if len(obses)>50:
+            test_obses.append(obses)
+            test_acts.append(acts)
+            if len(test_obses)>10:
+                break
+
     fig, axs = plt.subplots(3, 3, figsize=(15, 10))
     axs = np.ravel(axs)
     for action_idx, (ax, act) in enumerate(zip(axs, actions)):
@@ -192,6 +205,11 @@ def plot_individual_action_qvals():
         env.reset(init_state)
         otp1, *_ = env.step(act)
         ax.plot(*np.vstack([init_state, otp1]).T, c='k', marker='x', zorder=20)
+
+        for tobses, tacts in zip(test_obses, test_acts):
+            tobses = np.array(tobses).T
+            ax.plot(tobses[0], tobses[1], c='k', zorder=25)
+
 
         tracked_qvals = []
         for ts in tracking_states:
@@ -212,5 +230,5 @@ def plot_individual_action_qvals():
 
 if __name__ == '__main__':
     # plot_q_vals_grid_tracking_states()
-    # plot_q_vals_region_sampling_tracking_states()
-    plot_individual_action_qvals()
+    plot_q_vals_region_sampling_tracking_states()
+    # plot_individual_action_qvals()

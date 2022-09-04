@@ -10,8 +10,8 @@ def get_discrete_actions(n_act, act_dim=3):
         all_actions = [item[0] for item in all_actions]
     return all_actions
 
-
-class RandomEnvDiscreteActions(RandomEnv):
+import yaml
+class RandomEnvDiscreteActions(RandomEnv, yaml.YAMLObject):
     """
     Model dynamics creation follows that of RandomEnv exactly.
     This environment only assigns 3 discrete actions per one continuous action dimension.
@@ -22,13 +22,14 @@ class RandomEnvDiscreteActions(RandomEnv):
     """
     ACTION_EPS = 0.1
     AVAIL_MOM = [-ACTION_EPS, 0., ACTION_EPS]
+    yaml_tag = "!REDA"
 
     def __init__(self, n_obs, n_act, **kwargs):
         super(RandomEnvDiscreteActions, self).__init__(n_obs, n_act, **kwargs)
-        self.action_space = gym.spaces.MultiDiscrete(np.repeat(3, self.act_dimension))
         self.REWARD_SCALE = 1.
         self.TRIM_FACTOR = 20.
         self.EPISODE_LENGTH_LIMIT = 100
+        self.action_space = gym.spaces.MultiDiscrete(np.repeat(3, n_act))
 
         self.cum_action = None
         self.action_counter = None
@@ -75,6 +76,9 @@ class RandomEnvDiscreteActions(RandomEnv):
         delta_action = centered_action * self.ACTION_EPS
         return super(RandomEnvDiscreteActions, self).step(delta_action)
 
+    def objective(self, state):
+        return -np.sqrt(np.sum(np.square(state)))
+
     def get_optimal_action(self, state, state_clip=None):
         opt_action = super(RandomEnvDiscreteActions, self).get_optimal_action(state, state_clip)
         # delta_action = opt_action - self.get_actual_actions()
@@ -85,6 +89,18 @@ class RandomEnvDiscreteActions(RandomEnv):
 
     def get_actual_actions(self):
         return self.cum_action
+
+    @classmethod
+    def to_yaml(cls, dumper, env_instance):
+        return dumper.represent_mapping(cls.yaml_tag, {
+            'n_obs': env_instance.obs_dimension,
+            'n_act': env_instance.act_dimension,
+            'rm': env_instance.rm.tolist(),
+            'pi': env_instance.pi.tolist(),
+            'trim_stats': env_instance.trim_stats
+        })
+
+yaml.SafeDumper.add_representer(RandomEnvDiscreteActions, RandomEnvDiscreteActions.to_yaml)
 
 
 class REDAX(RandomEnvDiscreteActions):

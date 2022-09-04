@@ -1,4 +1,6 @@
 import yaml
+from random_env.envs.random_env import RandomEnv
+
 def init_label(label):
     if label:
         return f'{label}_'
@@ -103,6 +105,7 @@ def stepDecay_representer(dumper: yaml.SafeDumper, fun: StepDecay) -> yaml.nodes
         "label": fun.label
     })
 
+
 def get_training_utils_yaml_dumper():
     safe_dumper = yaml.SafeDumper
     safe_dumper.add_representer(CustomFunc, customFunc_representer)
@@ -112,6 +115,14 @@ def get_training_utils_yaml_dumper():
     safe_dumper.add_representer(StepDecay, stepDecay_representer)
     return safe_dumper
 
+
+import numpy as np
+def circular_initial_state_distribution_2d():
+    r = np.random.normal(0.9, 0.1)
+    theta = 2 * np.pi * np.random.rand()
+
+    return np.array([r * np.cos(theta), r * np.sin(theta)])
+    # return np.random.uniform(-1, 1, 3)
 
 if __name__ == '__main__':
     # fun = Constant(1., 'LR')

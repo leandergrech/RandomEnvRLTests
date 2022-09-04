@@ -1,30 +1,14 @@
 import os
-import yaml
-from datetime import datetime as dt
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
 import warnings
 warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 
+import numpy as np
 
 from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
 from experiments_tile_coding.eval_utils import eval_agent, make_state_violins
-from training_utils import *#ExponentialDecay, get_training_utils_yaml_dumper
 
 from tqdm import trange
-
-# sns.set_context('paper')
-sns.set_theme(style='whitegrid')
-
-def obs_init_func():
-    r = np.random.normal(0.9, 0.1)
-    theta = 2 * np.pi * np.random.rand()
-
-    return np.array([r * np.cos(theta), r * np.sin(theta)])
-    # return np.random.uniform(-1, 1, 3)
 
 
 def train_instance(**kwargs):
@@ -39,10 +23,12 @@ def train_instance(**kwargs):
     n_obs = kwargs.get('n_obs')
     n_act = kwargs.get('n_act')
 
-    env_save_path = kwargs.get('env_save_path', None)
-    env = REDA(n_obs, n_act)
-    eval_env = REDA(n_obs, n_act, model_info=env.model_info)
+    env = kwargs.get('env', None)
+    if env is None:
+        env = REDA(n_obs, n_act)
 
+    eval_env = REDA(n_obs, n_act, model_info=env.model_info)
+    env_save_path = kwargs.get('env_save_path', None)
     if env_save_path:
         env.save_dynamics(env_save_path)
 
@@ -75,7 +61,6 @@ def train_instance(**kwargs):
             act = q.greedy_action(obs)
         return act
 
-
     '''
     TRAINING LOOP
     '''
@@ -84,7 +69,8 @@ def train_instance(**kwargs):
     iht_counts = []
     lrs = []
 
-    o = env.reset(obs_init_func())
+    init_state_func = kwargs.get('init_state_func')
+    o = env.reset(init_state_func())
     a = q.greedy_action(o)
 
     for T in trange(nb_training_steps):
@@ -99,7 +85,7 @@ def train_instance(**kwargs):
         td_errors[T] = q.update(o, a, target, lr)
 
         if d:
-            o = env.reset(obs_init_func())
+            o = env.reset(init_state_func())
             a = get_action(T, o)
         else:
             o = otp1.copy()

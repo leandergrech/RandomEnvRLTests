@@ -52,7 +52,7 @@ class RandomEnv(Env):
         ''' RL related parameters'''
         self.current_state = None
         self._reward = None
-        self.reward_thresh = self.objective([self.GOAL] * self.obs_dimension)
+        # self.reward_thresh = self.objective([self.GOAL] * self.obs_dimension)
         self.reward_deque = deque(maxlen=RandomEnv.REWARD_DEQUE_SIZE)
         self._it = 0
         self.max_steps = self.EPISODE_LENGTH_LIMIT
@@ -339,13 +339,24 @@ def quick_testing_randomenv():
 
 
 # 03/02/2022
-class RunningStats():
+import yaml
+class RunningStats(yaml.YAMLObject):
     def __init__(self, size, axis=0):
         self.M = np.zeros(size)
         self.S = np.zeros(size)
         self.Min = np.repeat(np.inf, size)
         self.Max = np.repeat(-np.inf, size)
         self.n = 0
+
+    @classmethod
+    def to_yaml(cls, dumper, data):
+        return dumper.represent_mapping('!RunningStats', {
+            'Mean': data.M.tolist(),
+            'Std': data.S.tolist(),
+            'Min': data.Min.tolist(),
+            'Max': data.Max.tolist(),
+            'nb_calls': data.n
+        })
 
     def __repr__(self):
         return f"Mean: min={min(self.mean):.2f} max={max(self.mean):.2f}\n" \
@@ -393,6 +404,8 @@ class RunningStats():
             return 2 * np.ones_like(self.Min)
         else:
             return self.Max - self.Min
+
+yaml.SafeDumper.add_representer(RunningStats, RunningStats.to_yaml)
 
 
 def dynamic_scale_adjustment_test():

@@ -23,8 +23,8 @@ if __name__ == '__main__':
     nb_tilings, nb_bins = 16, 2
     gamma = 0.9
     train_params = dict(
-        n_obs=2,
-        n_act=2,
+        n_obs=3,
+        n_act=3,
         nb_tilings=nb_tilings,
         nb_bins=nb_bins,
         env_save_path=experiment_dir,

@@ -6,6 +6,25 @@ import seaborn as sns
 from random_env.envs import get_discrete_actions
 
 
+def play_episode(eval_env, q, init_state=None):
+    actions = get_discrete_actions(eval_env.act_dimension, 3)
+    obses = []
+    acts = []
+    rews = []
+    o = eval_env.reset(init_state)
+    obses.append(o.copy())
+    d = False
+    while not d:
+        a = q.greedy_action(o)
+        otp1, r, d, _ = eval_env.step(actions[a])
+        o = otp1
+        obses.append(o.copy())
+        acts.append(a)
+        rews.append(r)
+
+    return obses, acts, rews
+
+
 def eval_agent(eval_env, q, nb_eps):
     init_obses = np.empty(shape=(0, eval_env.obs_dimension))
     terminal_obses = np.empty(shape=(0, eval_env.obs_dimension))
