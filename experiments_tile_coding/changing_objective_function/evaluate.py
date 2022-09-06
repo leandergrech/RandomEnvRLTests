@@ -11,12 +11,12 @@ def unpack_stats(arr, key, rolling):
 
 def plot_individual_experiments(experiment_pardir):
     # experiment_pardir = 'sarsa_090222_020057'
-    uniform_stats_file = os.path.join(experiment_pardir,'uniform-reset/training_stats.pkl')
-    circular_stats_file = os.path.join(experiment_pardir,'circular-reset/training_stats.pkl')
+    quadratic_stats_file = os.path.join(experiment_pardir,'quadratic-objective/training_stats.pkl')
+    rms_stats_file = os.path.join(experiment_pardir,'rms-objective/training_stats.pkl')
 
     eval_every = 500
     fig, axs = plt.subplots(2, gridspec_kw=dict(height_ratios=[1,3]), figsize=(15, 10))
-    for label, pkl_fn, c in zip(('Uniform', 'Circular'), (uniform_stats_file, circular_stats_file), ('k', 'b')):
+    for label, pkl_fn, c in zip(('Quadratic', 'RMS'), (quadratic_stats_file, rms_stats_file), ('k', 'b')):
         with open(pkl_fn, 'rb') as f:
             data = pkl.load(f)
             el_stats = data['eval_el_stats']
@@ -43,13 +43,14 @@ def plot_individual_experiments(experiment_pardir):
         ax.legend(loc='best', prop=dict(size=8))
         ax.set_xlabel('Training steps')
     fig.tight_layout()
-    plt.savefig(os.path.join(experiment_pardir, 'results.png'))
+    plt.savefig(os.path.join(experiment_pardir, 'QO_vs_RO/results.png'))
     # plt.show()
 
 from collections import defaultdict
 def plot_all_experiments():
     experiment_pardir = '.'
-    sub_experiments_pardirs = ['circular-reset', 'uniform-reset']
+    # sub_experiments_pardirs = ['quadratic-objective', 'rms-objective']
+    sub_experiments_pardirs = ['quadratic-objective', 'quadratic-objective-x5', 'quadratic-objective-x10', 'rms-objective']
 
     ep_lens = defaultdict(lambda : defaultdict(list))
     iht_counts = defaultdict(list)
@@ -59,9 +60,10 @@ def plot_all_experiments():
     all_exp = []
 
     # Iterate over experiment with different environment
-    for exp_name in os.listdir(experiment_pardir):
+    for exp_name in sorted(os.listdir(experiment_pardir)):
         if 'sarsa' not in exp_name:
             continue
+
         all_exp.append(exp_name)
         experiment_dir = os.path.join(experiment_pardir, exp_name)
 
@@ -81,7 +83,8 @@ def plot_all_experiments():
                     xrange = np.arange(len(data['iht_counts'])) * eval_every
 
     fig, axs = plt.subplots(2, gridspec_kw=dict(height_ratios=[1, 3]), figsize=(15, 10))
-    for label, sub_exp, c in zip(('Circular', 'Uniform'), sub_experiments_pardirs, ('b', 'k')):
+    # for label, sub_exp, c in zip(('Quadratic', 'RMS'), sub_experiments_pardirs, ('b', 'k')):
+    for label, sub_exp, c in zip(('QO', 'QOx5', 'QOx10', 'RO'), sub_experiments_pardirs, ('b', 'g', 'r', 'k')):
         els = ep_lens[sub_exp]
         el_mean = np.mean(els['mean'], axis=0)
         el_med = np.mean(els['median'], axis=0)
@@ -96,28 +99,31 @@ def plot_all_experiments():
         ax = axs[0]
         ax.plot(xrange, iht_mean, ls='solid', c=c, label=f'{label} Mean')
         # ax.plot(xrange, iht_min, ls='dotted', c=c, label=f'{label} Min')
-        # ax.plot(xrange, iht_max, ls='dotted', c=c, label=f'{label} Max')
+        # ax.plot(xrange, iht_max, ls='dashed', c=c, label=f'{label} Max')
         ax.set_title('IHT counts')
         ax.set_ylabel('Nb tiles discovered')
-        # ax.set_yscale('log')
+        ax.set_yscale('log')
+        # ax.set_xscale('log')
 
         ax = axs[1]
         ax.plot(xrange, el_mean, ls='solid', c=c, label=f'{label} Mean')
         # ax.plot(xrange, el_med, ls='dashed', c=c, label=f'{label} Ave. Med.')
         ax.plot(xrange, el_min, ls='dotted', c=c, label=f'{label} Min')
-        ax.plot(xrange, el_max, ls='dotted', lw=0.5, c=c, label=f'{label} Max')
+        ax.plot(xrange, el_max, ls='dashed', c=c, label=f'{label} Max')
         ax.set_title('Using greedy policy')
         ax.set_ylabel('Episode length')
         # ax.set_yscale('log')
+        # ax.set_xscale('log')
 
     for ax in axs:
-        ax.legend(loc='best', prop=dict(size=8))
+        ax.legend(loc='best', prop=dict(size=10))
         ax.set_xlabel('Training steps')
-    fig.suptitle(f'State initiliasation experiment with\n{len(all_exp)} different environments')
+    fig.suptitle(f'Objective function experiment with\n{len(all_exp)} different environments')
     fig.tight_layout()
     plt.savefig(os.path.join(experiment_pardir, 'results.png'))
 
 if __name__ == '__main__':
+    # plot_individual_experiments('sarsa_090522_233119')
     plot_all_experiments()
 
 

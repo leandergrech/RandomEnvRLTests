@@ -70,11 +70,14 @@ def train_instance(**kwargs):
     lrs = []
 
     init_state_func = kwargs.get('init_state_func')
+    objective_func = kwargs.get('objective_func')
     o = env.reset(init_state_func())
     a = q.greedy_action(o)
 
     for T in trange(nb_training_steps):
-        otp1, r, d, _ = env.step(actions[a])
+        otp1, _, d, _ = env.step(actions[a])
+        r = objective_func(otp1)
+
         a_ = get_action(T, otp1)
 
         target = r + gamma * q.value(otp1, a_)

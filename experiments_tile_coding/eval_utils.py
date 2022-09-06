@@ -66,3 +66,30 @@ def make_state_violins(init_obses, terminal_obses, path):
         os.makedirs(path_dir)
     plt.savefig(path)
     plt.close(fig)
+
+
+def get_optimal_ep_len(env):
+    nb_eps = 200
+    ep_lens = []
+    for _ in range(nb_eps):
+        o = env.reset()
+        d = False
+        t = 0
+        while not d:
+            a = env.get_optimal_action(o)
+            otp1, _, d, _ = env.step(a)
+            otp1 = o
+            t += 1
+        ep_lens.append(t)
+    return np.mean(ep_lens)
+
+if __name__ == '__main__':
+    from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA
+    from tqdm import trange
+    ep_lens = []
+    for _ in trange(20):
+        env = REDA(2,2)
+        ep_lens.append(get_optimal_ep_len(env))
+    fig, ax = plt.subplots()
+    ax.plot(ep_lens)
+    plt.show()
