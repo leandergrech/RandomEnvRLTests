@@ -50,19 +50,19 @@ from collections import defaultdict
 def plot_all_experiments():
     experiment_pardir = '.'
     # sub_experiments_pardirs = ['quadratic-objective', 'rms-objective']
-    sub_experiments_pardirs = ['quadratic-objective', 'quadratic-objective-x5', 'quadratic-objective-x10', 'rms-objective']
+    sub_experiments_pardirs = ['no-clipping', 'clip-1.0', 'clip-1.2', 'clip-1.5']
 
     # ep_lens = defaultdict(lambda : defaultdict(list))
     ep_lens = defaultdict(list)
     iht_counts = defaultdict(list)
     xrange = None
-    eval_every = 500
+    eval_every = 50
 
     all_exp = []
 
     # Iterate over experiment with different environment
     for exp_name in sorted(os.listdir(experiment_pardir)):
-        if 'sarsa' not in exp_name:
+        if 'sarsa' not in exp_name:# or '154939' not in exp_name:
             continue
 
         all_exp.append(exp_name)
@@ -85,30 +85,26 @@ def plot_all_experiments():
 
     fig, axs = plt.subplots(2, gridspec_kw=dict(height_ratios=[1, 3]), figsize=(15, 10))
     # for label, sub_exp, c in zip(('Quadratic', 'RMS'), sub_experiments_pardirs, ('b', 'k')):
-    for label, sub_exp, c in zip(('QO', 'QOx5', 'QOx10', 'RO'), sub_experiments_pardirs, ('b', 'g', 'r', 'k')):
+    for label, sub_exp, c in zip(('No clip', 'Clip 1.0', 'Clip 1.2', 'Clip 1.5'), sub_experiments_pardirs, ('b', 'g', 'r', 'k')):
         els = ep_lens[sub_exp]
         el_mean = np.mean(np.mean(els, axis=-1), axis=0)
         el_std = np.sqrt(np.mean(np.square(np.std(els, axis=-1)), axis=0))
 
         ihts= iht_counts[sub_exp]
         iht_mean = np.mean(ihts, axis=0)
-        iht_min = np.min(ihts, axis=0)
-        iht_max = np.max(ihts, axis=0)
+        iht_std = np.std(ihts, axis=0)
 
         ax = axs[0]
-        ax.plot(xrange, iht_mean, ls='solid', c=c, label=f'{label} Mean')
-        # ax.plot(xrange, iht_min, ls='dotted', c=c, label=f'{label} Min')
-        # ax.plot(xrange, iht_max, ls='dashed', c=c, label=f'{label} Max')
+        ax.plot(xrange, iht_mean, ls='solid', c=c, label=f'{label} ' + r'$\mu$')
+        ax.plot(xrange, iht_mean - iht_std, ls='dotted', c=c, label=f'{label} ' + r'$\mu-\sigma$', alpha=0.6)
+        ax.plot(xrange, iht_mean + iht_std, ls='dashed', c=c, label=f'{label} ' + r'$\mu+\sigma$', alpha=0.6)
         ax.set_title('IHT counts')
         ax.set_ylabel('Nb tiles discovered')
-        ax.set_yscale('log')
+        # ax.set_yscale('log')
         # ax.set_xscale('log')
 
         ax = axs[1]
         ax.plot(xrange, el_mean, ls='solid', c=c, label=f'{label} ' + r'$\mu$')
-        # ax.plot(xrange, el_med, ls='dashed', c=c, label=f'{label} Ave. Med.')
-        # ax.plot(xrange, el_min, ls='dotted', c=c, label=f'{label} Min')
-        # ax.plot(xrange, el_max, ls='dashed', c=c, label=f'{label} Max')
         ax.plot(xrange, el_mean-el_std, ls='dotted', c=c, label=f'{label} ' + r'$\mu-\sigma$')
         ax.plot(xrange, el_mean+el_std, ls='dashed', c=c, label=f'{label} ' + r'$\mu+\sigma$')
         ax.set_title('Using greedy policy')
@@ -119,7 +115,7 @@ def plot_all_experiments():
     for ax in axs:
         ax.legend(loc='best', prop=dict(size=10))
         ax.set_xlabel('Training steps')
-    fig.suptitle(f'Objective function experiment with\n{len(all_exp)} different environments')
+    fig.suptitle(f'State clipping experiment with\n{len(all_exp)} different environments')
     fig.tight_layout()
     plt.savefig(os.path.join(experiment_pardir, 'results.png'))
 

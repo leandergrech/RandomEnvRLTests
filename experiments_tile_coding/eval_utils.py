@@ -46,8 +46,8 @@ def eval_agent(eval_env, q, nb_eps):
         ep_lens.append(t)
 
     obses = dict(initial_observations=init_obses, terminal_observations=terminal_obses)
-    ep_len_stats = dict(mean=np.mean(ep_lens), median=np.median(ep_lens), min=min(ep_lens), max=max(ep_lens))
-    return obses, ep_len_stats
+    # ep_len_stats = dict(mean=np.mean(ep_lens), median=np.median(ep_lens), min=min(ep_lens), max=max(ep_lens))
+    return obses, ep_lens
 
 
 def make_state_violins(init_obses, terminal_obses, path):

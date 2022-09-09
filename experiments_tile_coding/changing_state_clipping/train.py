@@ -12,28 +12,15 @@ from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions
 
 def run_experiment(exp_name):
     n_obs, n_act = 2, 2
-    env = REDA(n_obs, n_act)
+
     exp_fun = LinearDecay(1.0, 0.0, 80000, label='EXP')
     lr_fun = Constant(1e-1, label='LR')
     nb_tilings, nb_bins = 16, 2
     gamma = 0.9
 
-    init_state_func = env.reset
-
-    def quadratic_objective(state):
-        return -np.mean(np.square(state))
-
-    def quadratic_objective_x5(state):
-        return quadratic_objective(state) * 5.
-
-    def quadratic_objective_x10(state):
-        return quadratic_objective(state) * 10.
-
-    def rms_objective(state):
-        return -np.sqrt(np.mean(np.square(state)))
-
-    for experiment_name, objective_func in zip(('quadratic-objective', 'quadratic-objective-x5', 'quadratic-objective-x10', 'rms-objective'),
-                                               (quadratic_objective, quadratic_objective_x5, quadratic_objective_x10, rms_objective)):
+    for experiment_name, state_clip in zip(('no-clipping', 'clip-1.0', 'clip-1.2', 'clip-1.5'),
+                                    (0.0, 1.0, 1.2, 1.5)):
+        env = REDAClip(n_obs, n_act, state_clip)
         experiment_dir = os.path.join(exp_name, experiment_name)
         os.makedirs(experiment_dir)
 
@@ -57,8 +44,8 @@ def run_experiment(exp_name):
         with open(os.path.join(experiment_dir, "train_params.yml"), "w") as f:
             f.write(yaml.dump(train_params, Dumper=get_training_utils_yaml_dumper()))
 
-        train_params['init_state_func'] = init_state_func
-        train_params['objective_func'] = objective_func
+        train_params['init_state_func'] = env.reset
+        train_params['objective_func'] = env.objective
 
         errors, ep_lens, iht_counts, lrs, env = train_instance(**train_params)
 
@@ -71,5 +58,5 @@ if __name__ == '__main__':
     with Pool(8) as p:
         exp_prefix = dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S')
         p.map(run_experiment, [f'{exp_prefix}_{item}' for item in range(16)])
-        # run_experiment()
+        run_experiment(exp_prefix)
 

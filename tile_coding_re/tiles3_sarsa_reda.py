@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import trange
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
-from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
+from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions, REDAClip
 from tile_coding_re.heatmap_utils import make_heatmap, update_heatmap
 # from tile_coding_re.training_utils import lr
 from copy import deepcopy
@@ -13,7 +13,7 @@ Environment info
 '''
 n_obs = 2
 n_act = 2
-env = REDA(n_obs, n_act, estimate_scaling=True)
+env = REDAClip(n_obs, n_act, estimate_scaling=True)
 # env.TRIM_FACTOR = 2.
 # env.load_dynamics('env_dynamics')
 
@@ -31,7 +31,7 @@ nb_bins = 2
 # ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)] + [[0.0, 0.05]]
 # REDA ranges
 ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
-max_tiles = 2 ** 20
+max_tiles = 2 ** 18
 
 tilings = Tilings(nb_tilings, nb_bins, ranges, max_tiles)
 actions = get_discrete_actions(n_act, 3)
@@ -62,7 +62,7 @@ exploration_str = f'Step decay EXP: {init_exploration}x{exploration_decay_rate}^
 gamma = 0.9
 
 nb_eps = 200
-eval_every_t_timesteps = 2000
+eval_every_t_timesteps = 4000
 
 # Training counters
 T = 0
@@ -102,8 +102,8 @@ def play_ep_get_obs_and_cumrew():
 '''
 Initialise the states that will have their values and visitations tracked
 '''
-dim_size = int(nb_bins * nb_tilings)
-tracking_lim = 1.0
+tracking_lim = 1.6
+dim_size = int(nb_bins * nb_tilings * tracking_lim)
 if n_obs == 1:
     tracking_ranges = np.multiply(ranges, tracking_lim)
 else:

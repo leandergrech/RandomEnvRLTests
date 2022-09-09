@@ -77,7 +77,7 @@ class RandomEnvDiscreteActions(RandomEnv, yaml.YAMLObject):
         return super(RandomEnvDiscreteActions, self).step(delta_action)
 
     def objective(self, state):
-        return -np.sqrt(np.sum(np.square(state)))
+        return -np.sqrt(np.mean(np.square(state)))
 
     def get_optimal_action(self, state, state_clip=None):
         opt_action = super(RandomEnvDiscreteActions, self).get_optimal_action(state, state_clip)
@@ -102,7 +102,6 @@ class RandomEnvDiscreteActions(RandomEnv, yaml.YAMLObject):
 
 yaml.SafeDumper.add_representer(RandomEnvDiscreteActions, RandomEnvDiscreteActions.to_yaml)
 
-
 class REDAX(RandomEnvDiscreteActions):
     def __init__(self, n_obs, n_act, **kwargs):
         super(REDAX, self).__init__(n_obs, n_act, **kwargs)
@@ -112,6 +111,40 @@ class REDAX(RandomEnvDiscreteActions):
     def step(self, action):
         return super(REDAX, self).step(self.actions[action])
 
+class REDAClip(RandomEnvDiscreteActions):
+    yaml_tag = '!REDAClip'
+    def __init__(self, n_obs, n_act, state_clip=1.2, **kwargs):
+        super(REDAClip, self).__init__(n_obs, n_act, **kwargs)
+        self.state_clip = state_clip
+
+    def step(self, action):
+        otp1, r, d, info = super(REDAClip, self).step(action)
+
+        R = np.sqrt(np.mean(np.square(otp1)))
+        # if any(np.where(otp1<self.state_clip_range[0], True, False)) or \
+        #     any(np.where(otp1>self.state_clip_range[1], True, False)):
+        if R > self.state_clip and self.state_clip > 0.0:
+            d = True
+            info['success'] = False
+            # self.current_state = np.clip(otp1, *self.state_clip_range)
+            self.current_state = otp1 * (self.state_clip / R)
+
+        return self.current_state, r, d, info
+
+    def __repr__(self):
+        return f'REDAClip_{self.state_clip}clip_{self.obs_dimension}obsx{self.act_dimension}act'
+
+    @classmethod
+    def to_yaml(cls, dumper, env_instance):
+        return dumper.represent_mapping(cls.yaml_tag, {
+            'n_obs': env_instance.obs_dimension,
+            'n_act': env_instance.act_dimension,
+            'state_clip': env_instance.state_clip,
+            'rm': env_instance.rm.tolist(),
+            'pi': env_instance.pi.tolist(),
+            'trim_stats': env_instance.trim_stats
+        })
+yaml.SafeDumper.add_representer(REDAClip, REDAClip.to_yaml)
 
 class VREDA(RandomEnvDiscreteActions):
     def __init__(self, *args, **kwargs):
