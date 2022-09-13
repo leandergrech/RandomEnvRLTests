@@ -54,12 +54,14 @@ def train_instance(**kwargs):
     nb_training_steps = kwargs.get('nb_training_steps')
     eval_every = kwargs.get('eval_every')
 
-    def get_action(t, obs):
-        if np.random.rand() < exp_fun(t):
-            act = np.random.choice(n_actions)
-        else:
-            act = q.greedy_action(obs)
-        return act
+    policy = kwargs.get('policy')
+
+    # def policy(t, obs, q):
+    #     if np.random.rand() < exp_fun(t):
+    #         act = np.random.choice(n_actions)
+    #     else:
+    #         act = q.greedy_action(obs)
+    #     return act
 
     '''
     TRAINING LOOP
@@ -78,7 +80,8 @@ def train_instance(**kwargs):
         otp1, _, d, _ = env.step(actions[a])
         r = objective_func(otp1)
 
-        a_ = get_action(T, otp1)
+        exploration = exp_fun(T)
+        a_ = policy(otp1, q, exploration)
 
         target = r + gamma * q.value(otp1, a_)
 
@@ -89,7 +92,7 @@ def train_instance(**kwargs):
 
         if d:
             o = env.reset(init_state_func())
-            a = get_action(T, o)
+            a = policy(o, q, exploration)
         else:
             o = otp1.copy()
             a = a_

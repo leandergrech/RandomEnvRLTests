@@ -113,7 +113,7 @@ class REDAX(RandomEnvDiscreteActions):
 
 class REDAClip(RandomEnvDiscreteActions):
     yaml_tag = '!REDAClip'
-    def __init__(self, n_obs, n_act, state_clip=1.2, **kwargs):
+    def __init__(self, n_obs, n_act, state_clip=0.0, **kwargs):
         super(REDAClip, self).__init__(n_obs, n_act, **kwargs)
         self.state_clip = state_clip
 
@@ -145,6 +145,7 @@ class REDAClip(RandomEnvDiscreteActions):
             'trim_stats': env_instance.trim_stats
         })
 yaml.SafeDumper.add_representer(REDAClip, REDAClip.to_yaml)
+
 
 class VREDA(RandomEnvDiscreteActions):
     def __init__(self, *args, **kwargs):

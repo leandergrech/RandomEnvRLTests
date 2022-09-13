@@ -7,21 +7,42 @@ import pickle as pkl
 
 from training_utils import ExponentialDecay, Constant, get_training_utils_yaml_dumper, LinearDecay, StepDecay, circular_initial_state_distribution_2d
 from experiments_tile_coding.sarsa import train_instance; algo_name = 'sarsa'
-from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA, REDAClip
+from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA, REDAClip, get_discrete_actions
 
 
 def run_experiment(exp_name):
     n_obs, n_act = 2, 2
-    env = REDAClip(n_obs, n_act, state_clip=0.0)
+    state_clip = 0.0
+    env = REDAClip(n_obs, n_act, state_clip)
+    nb_actions = len(get_discrete_actions(n_act, 3))
 
-    exp_fun = LinearDecay(1.0, 0.0, 80000, label='EXP')
+    eps_fun = LinearDecay(1.0, 0.0, 80000, label='EPS')
+    tau_fun1 = LinearDecay(10.0, 1e-2, 80000, label='TAU')
+    tau_fun2 = LinearDecay(5.0, 1e-2, 80000, label='TAU')
+    tau_fun3 = LinearDecay(1.0, 1e-2, 80000, label='TAU')
     lr_fun = Constant(1e-1, label='LR')
     nb_tilings, nb_bins = 16, 2
     gamma = 0.9
 
-    for experiment_name, state_clip in zip(('no-clipping', 'clip-1.0', 'clip-1.2', 'clip-1.5'),
-                                           (0.0, 1.0, 1.2, 1.5)):
-        env.state_clip = state_clip
+    def eps_greedy(s, q, epsilon):
+        nonlocal nb_actions
+        if np.random.rand() < epsilon:
+            return np.random.choice(nb_actions)
+        else:
+            return q.greedy_action(s)
+
+    def boltzmann(s, q, tau):
+        nonlocal nb_actions
+        qvals_exp = np.exp([q.value(s, a_)/tau for a_ in range(nb_actions)])
+        qvals_exp_sum = np.sum(qvals_exp)
+
+        cum_probas = np.cumsum(qvals_exp/qvals_exp_sum)
+        return np.searchsorted(cum_probas, np.random.rand())
+
+    sub_experiments_names = ['eps-greedy', 'boltz-10', 'boltz-5', 'boltz-1']
+    for experiment_name, policy, exp_fun in zip(sub_experiments_names,
+                                                (eps_greedy, boltzmann, boltzmann, boltzmann),
+                                                (eps_fun, tau_fun1, tau_fun2, tau_fun3)):
         experiment_dir = os.path.join(exp_name, experiment_name)
         os.makedirs(experiment_dir)
 
@@ -47,6 +68,7 @@ def run_experiment(exp_name):
 
         train_params['init_state_func'] = env.reset
         train_params['objective_func'] = env.objective
+        train_params['policy'] = policy
 
         errors, ep_lens, iht_counts, lrs, env = train_instance(**train_params)
 
@@ -56,8 +78,10 @@ def run_experiment(exp_name):
 
 from multiprocessing import Pool
 if __name__ == '__main__':
+    nb_trials = 16
     with Pool(8) as p:
         exp_prefix = dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S')
-        p.map(run_experiment, [f'{exp_prefix}_{item}' for item in range(16)])
-        run_experiment(exp_prefix)
+        p.map(run_experiment, [f'{exp_prefix}_{item}' for item in range(nb_trials)])
+    # exp_prefix = dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S')
+    # run_experiment(exp_prefix)
 

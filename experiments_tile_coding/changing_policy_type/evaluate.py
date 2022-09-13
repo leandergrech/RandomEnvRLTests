@@ -49,21 +49,20 @@ def plot_individual_experiments(experiment_pardir):
 from collections import defaultdict
 def plot_all_experiments():
     experiment_pardir = '.'
-    # sub_experiments_pardirs = ['quadratic-objective', 'rms-objective']
-    sub_experiments_pardirs = ['no-clipping', 'clip-1.5', 'clip-1.2', 'clip-1.0']
-    sub_experiments_labels = ['No clip', 'Clip 1.5', 'Clip 1.2', 'Clip 1.0']
+    sub_experiments_pardirs = ['eps-greedy', 'boltz-10', 'boltz-5', 'boltz-1']
+    sub_experiments_labels = ['Eps-greedy', 'Boltz10', 'Boltz5', 'Boltz1']
 
     # ep_lens = defaultdict(lambda : defaultdict(list))
     ep_lens = defaultdict(list)
     iht_counts = defaultdict(list)
     xrange = None
-    eval_every = 50
+    eval_every = 500
 
     all_exp = []
 
     # Iterate over experiment with different environment
     for exp_name in sorted(os.listdir(experiment_pardir)):
-        if 'sarsa' not in exp_name:# or exp_name == 'sarsa_090922_165757':
+        if 'sarsa' not in exp_name or int(exp_name.split('_')[-1])>7:
             continue
 
         all_exp.append(exp_name)
@@ -97,8 +96,8 @@ def plot_all_experiments():
 
         ax = axs[0]
         ax.plot(xrange, iht_mean, ls='solid', c=c, label=f'{label} ' + r'$\mu$')
-        ax.plot(xrange, iht_mean - iht_std, ls='dotted', c=c, label=f'{label} ' + r'$\mu-\sigma$', alpha=0.6)
-        ax.plot(xrange, iht_mean + iht_std, ls='dashed', c=c, label=f'{label} ' + r'$\mu+\sigma$', alpha=0.6)
+        # ax.plot(xrange, iht_mean - iht_std, ls='dotted', c=c, label=f'{label} ' + r'$\mu-\sigma$', alpha=0.6)
+        # ax.plot(xrange, iht_mean + iht_std, ls='dashed', c=c, label=f'{label} ' + r'$\mu+\sigma$', alpha=0.6)
         ax.set_title('IHT counts')
         ax.set_ylabel('Nb tiles discovered')
         # ax.set_yscale('log')
@@ -116,7 +115,7 @@ def plot_all_experiments():
     for ax in axs:
         ax.legend(loc='best', prop=dict(size=10))
         ax.set_xlabel('Training steps')
-    fig.suptitle(f'State clipping experiment with\n{len(all_exp)} different environments')
+    fig.suptitle(f'Changin type of policy\n{len(all_exp)} different environments')
     fig.tight_layout()
     plt.savefig(os.path.join(experiment_pardir, 'results.png'))
 

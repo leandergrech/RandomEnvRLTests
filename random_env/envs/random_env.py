@@ -227,7 +227,10 @@ class RandomEnv(Env):
                 f'Directory passed: {save_dir}, already contains dynamics for a {self.__repr__()} environment.')
 
     def load_dynamics(self, load_dir):
-        load_path = os.path.join(load_dir, self.__repr__() + RandomEnv.SAVED_MODEL_SUFFIX)
+        if '.pkl' in load_dir:
+            load_path = load_dir
+        else:
+            load_path = os.path.join(load_dir, self.__repr__() + RandomEnv.SAVED_MODEL_SUFFIX)
         if os.path.exists(load_path):
             with open(load_path, 'rb') as f:
                 dynamics = pkl.load(f)
@@ -236,7 +239,7 @@ class RandomEnv(Env):
                 self.trim_stats = dynamics['trim_stats']
         else:
             raise FileNotFoundError(
-                f'Directory passed: {load_dir}, does not contain dynamics for a {self.__repr__()} envirnment.')
+                f'Directory passed: {load_dir}, does not contain dynamics for a {self.__repr__()} environment.')
 
     @classmethod
     def load_from_dir(cls, load_dir):

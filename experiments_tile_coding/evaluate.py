@@ -6,7 +6,7 @@ import matplotlib as mpl
 import pickle as pkl
 from tqdm import tqdm as pbar
 from tile_coding_re.tiles3_qfunction import QValueFunctionTiles3
-from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA, get_discrete_actions
+from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA, get_discrete_actions, REDAClip
 
 def get_latest_experiment():
     lab_dir = '/home/leander/code/RandomEnvRLTests/experiments_tile_coding/'
@@ -159,10 +159,15 @@ def plot_q_vals_region_sampling_tracking_states():
 from tile_coding_re.heatmap_utils import make_heatmap
 from experiments_tile_coding.eval_utils import play_episode
 def plot_individual_action_qvals():
-    experiment_dir = get_latest_experiment()
+    # experiment_dir = get_latest_experiment()
+    experiment_dir = 'changing_policy_type/sarsa_091222_223617_5/boltz-5'
     experiment_name = os.path.split(experiment_dir)
 
-    env = REDA.load_from_dir(experiment_dir)
+    # env = REDA.load_from_dir(experiment_dir)
+    env = REDAClip(2, 2, state_clip=0.0)
+    env.load_dynamics(os.path.join(experiment_dir, 'REDAClip_0.0clip_2obsx2act_dynamics.pkl'))
+    env.state_clip = 0.0
+
     actions = get_discrete_actions(env.act_dimension, 3)
     nb_actions = len(actions)
 
@@ -172,7 +177,7 @@ def plot_individual_action_qvals():
     # qs = [QValueFunctionTiles3.load(item) for item in q_func_filenames]
     nb_q_funcs = len(q_func_filenames)
 
-    query_training_step = 80000-1
+    query_training_step = 100000-1
     qfn_at_step = q_func_filenames[np.searchsorted(training_steps, query_training_step)]
     at_training_step = get_q_func_step(qfn_at_step)
 
@@ -187,7 +192,7 @@ def plot_individual_action_qvals():
 
     q = QValueFunctionTiles3.load(qfn_at_step)
 
-    nb_test_eps = 1000
+    nb_test_eps = 3
     test_obses = []
     test_acts = []
     for _ in range(nb_test_eps):
@@ -219,16 +224,111 @@ def plot_individual_action_qvals():
         tracked_qvals = np.array(tracked_qvals).reshape((n_tracking_dim, n_tracking_dim))
         tracked_qvals = np.flipud(np.rot90(tracked_qvals))
         make_heatmap(ax, tracked_qvals, tracking_states.T[0], tracking_states.T[1], title=f'{act}')
-
+        ax.add_patch(mpl.patches.Circle((0,0), env.GOAL, edgecolor='g', ls='--', facecolor='None', zorder=20))
 
     fig.suptitle(f'{repr(env)}\n'
                  f'Training step = {at_training_step}')
     # fig.tight_layout()
     plt.subplots_adjust(left=0.1, bottom=0.05, right=0.9, top=0.88, wspace=0.083, hspace=0.321)
     plt.savefig(os.path.join(experiment_dir, f'individual_action_qvals_at-step-{at_training_step}.png'))
-    plt.show()
+
+    fig, ax = plt.subplots()
+    qvals = []
+    for ts in tracking_states:
+        qvals.append(np.max([q.value(ts, a_) for a_ in range(nb_actions)]))
+    qvals = np.array(qvals).reshape((n_tracking_dim, n_tracking_dim))
+    qvals = np.flipud(np.rot90(qvals))
+    make_heatmap(ax, qvals, tracking_states.T[0], tracking_states.T[1], title='Estimated values')
+    ax.add_patch(mpl.patches.Circle((0, 0), env.GOAL, edgecolor='g', ls='--', facecolor='None', zorder=20))
+    plt.savefig(os.path.join(experiment_dir, f'vals_at-step-{at_training_step}.png'))
+    # plt.show()
+
+
+def plot_compare_qvals_during_training():
+    experiment_dir = 'changing_policy_type/sarsa_091222_223617_5/boltz-1'
+    experiment_name = os.path.split(experiment_dir)
+
+    # env = REDA.load_from_dir(experiment_dir)
+    env = REDAClip(2, 2, state_clip=0.0)
+    env.load_dynamics(os.path.join(experiment_dir, 'REDAClip_0.0clip_2obsx2act_dynamics.pkl'))
+    env.state_clip = 0.0
+
+    actions = get_discrete_actions(env.act_dimension, 3)
+    nb_actions = len(actions)
+
+    print('Searching for training data')
+    q_func_filenames = get_q_func_filenames(experiment_dir)
+    training_steps = [get_q_func_step(qfn) for qfn in q_func_filenames]
+    # qs = [QValueFunctionTiles3.load(item) for item in q_func_filenames]
+    nb_q_funcs = len(q_func_filenames)
+
+    query_training_step_start = 79500 - 1
+    query_training_step_finish = 80000- 1
+
+    qs = []
+    actual_steps = []
+    for step in (query_training_step_start, query_training_step_finish):
+        qfn_at_step = q_func_filenames[np.searchsorted(training_steps, step)]
+        at_training_step = get_q_func_step(qfn_at_step)
+        actual_steps.append(at_training_step)
+        q = QValueFunctionTiles3.load(qfn_at_step)
+        qs.append(q)
+
+    # Initialise grid tracking states
+    n_tracking_dim = 64
+    tracking_lim = 1.2
+    tracking_ranges = [[-tracking_lim, -tracking_lim], [tracking_lim, tracking_lim]]
+    tracking_ranges = [[l, h] for l, h in zip(*tracking_ranges)]
+    tracking_states = np.array(
+        [list(item) for item in product(*np.array([np.linspace(l, h, n_tracking_dim) for l, h in tracking_ranges]))])
+    nb_tracked = len(tracking_states)
+
+    tracked_qvals = []
+    for q in qs:
+        tracked_qvals.append([])
+        for action_idx in range(nb_actions):
+            tracked_qvals[-1].append([])
+            temp = []
+            for ts in tracking_states:
+                # ax.scatter(ts[0], ts[1], marker='o', c='k')
+                qval = q.value(ts, action_idx)
+                temp.append(qval)
+            temp = np.array(temp).reshape((n_tracking_dim, n_tracking_dim))
+            tracked_qvals[-1][-1].append(np.flipud(np.rot90(temp)))
+    tracked_qvals = -np.squeeze(np.subtract(*tracked_qvals))
+
+
+
+    fig, axs = plt.subplots(3, 3, figsize=(15, 10))
+    axs = np.ravel(axs)
+    for action_idx, (ax, act, qvals) in enumerate(zip(axs, actions, tracked_qvals)):
+        init_state = np.array([0.0, 0.0])
+        env.reset(init_state.copy())
+        otp1, *_ = env.step(act)
+        ax.plot(*np.vstack([init_state, otp1]).T, c='k', marker='x', zorder=20)
+
+
+        make_heatmap(ax, qvals, tracking_states.T[0], tracking_states.T[1], title=f'{act}')
+        ax.add_patch(mpl.patches.Circle((0, 0), env.GOAL, edgecolor='g', ls='--', facecolor='None', zorder=20))
+
+    fig.suptitle(f'{repr(env)}\n'
+                 f'Training step = {actual_steps}')
+    # fig.tight_layout()
+    plt.subplots_adjust(left=0.1, bottom=0.05, right=0.9, top=0.88, wspace=0.083, hspace=0.321)
+    plt.savefig(os.path.join(experiment_dir, f'change_action_qvals_from-step-{actual_steps[0]}-to-step-{actual_steps[1]}.png'))
+
+    # fig, ax = plt.subplots()
+    # qvals = []
+    # for ts in tracking_states:
+    #     qvals.append(np.max([q.value(ts, a_) for a_ in range(nb_actions)]))
+    # qvals = np.array(qvals).reshape((n_tracking_dim, n_tracking_dim))
+    # qvals = np.flipud(np.rot90(qvals))
+    # make_heatmap(ax, qvals, tracking_states.T[0], tracking_states.T[1], title='Estimated values')
+    # ax.add_patch(mpl.patches.Circle((0, 0), env.GOAL, edgecolor='g', ls='--', facecolor='None', zorder=20))
+    # plt.savefig(os.path.join(experiment_dir, f'vals_at-step-{at_training_step}.png'))
 
 if __name__ == '__main__':
     # plot_q_vals_grid_tracking_states()
-    plot_q_vals_region_sampling_tracking_states()
+    # plot_q_vals_region_sampling_tracking_states()
     # plot_individual_action_qvals()
+    plot_compare_qvals_during_training()
