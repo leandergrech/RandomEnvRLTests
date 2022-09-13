@@ -29,6 +29,7 @@ def eval_agent(eval_env, q, nb_eps):
     init_obses = np.empty(shape=(0, eval_env.obs_dimension))
     terminal_obses = np.empty(shape=(0, eval_env.obs_dimension))
     ep_lens = []
+    returns= []
 
     actions = get_discrete_actions(eval_env.act_dimension, 3)
     for _ in range(nb_eps):
@@ -36,18 +37,21 @@ def eval_agent(eval_env, q, nb_eps):
         d = False
         init_obses = np.vstack([init_obses, o])
         t = 0
+        g = 0
         while not d:
             a = q.greedy_action(o)
             otp1, r, d, _ = eval_env.step(actions[a])
 
+            g += r
             o = otp1
             t += 1
         terminal_obses = np.vstack([terminal_obses, o])
         ep_lens.append(t)
+        returns.append(g)
 
     obses = dict(initial_observations=init_obses, terminal_observations=terminal_obses)
     # ep_len_stats = dict(mean=np.mean(ep_lens), median=np.median(ep_lens), min=min(ep_lens), max=max(ep_lens))
-    return obses, ep_lens
+    return obses, returns, ep_lens
 
 
 def make_state_violins(init_obses, terminal_obses, path):

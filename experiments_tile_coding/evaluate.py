@@ -158,9 +158,9 @@ def plot_q_vals_region_sampling_tracking_states():
 
 from tile_coding_re.heatmap_utils import make_heatmap
 from experiments_tile_coding.eval_utils import play_episode
-def plot_individual_action_qvals():
+def plot_individual_action_advs():
     # experiment_dir = get_latest_experiment()
-    experiment_dir = 'changing_policy_type/sarsa_091222_223617_5/boltz-5'
+    experiment_dir = 'changing_policy_type/sarsa_091322_005443_0/boltz-5'
     experiment_name = os.path.split(experiment_dir)
 
     # env = REDA.load_from_dir(experiment_dir)
@@ -177,7 +177,7 @@ def plot_individual_action_qvals():
     # qs = [QValueFunctionTiles3.load(item) for item in q_func_filenames]
     nb_q_funcs = len(q_func_filenames)
 
-    query_training_step = 100000-1
+    query_training_step = 80000-1
     qfn_at_step = q_func_filenames[np.searchsorted(training_steps, query_training_step)]
     at_training_step = get_q_func_step(qfn_at_step)
 
@@ -203,11 +203,15 @@ def plot_individual_action_qvals():
             if len(test_obses)>10:
                 break
 
+    tracking_estimated_vals = []
+    for ts in tracking_states:
+        tracking_estimated_vals.append(np.mean([q.value(ts, a_) for a_ in range(nb_actions)]))
+
     fig, axs = plt.subplots(3, 3, figsize=(15, 10))
     axs = np.ravel(axs)
     for action_idx, (ax, act) in enumerate(zip(axs, actions)):
         init_state = np.array([0.0, 0.0])
-        env.reset(init_state)
+        env.reset(init_state.copy())
         otp1, *_ = env.step(act)
         ax.plot(*np.vstack([init_state, otp1]).T, c='k', marker='x', zorder=20)
 
@@ -216,21 +220,22 @@ def plot_individual_action_qvals():
             ax.plot(tobses[0], tobses[1], c='k', zorder=25)
 
 
-        tracked_qvals = []
-        for ts in tracking_states:
+        tracked_advs = []
+        for ts, tv in zip(tracking_states, tracking_estimated_vals):
             # ax.scatter(ts[0], ts[1], marker='o', c='k')
             qval = q.value(ts, action_idx)
-            tracked_qvals.append(qval)
-        tracked_qvals = np.array(tracked_qvals).reshape((n_tracking_dim, n_tracking_dim))
-        tracked_qvals = np.flipud(np.rot90(tracked_qvals))
-        make_heatmap(ax, tracked_qvals, tracking_states.T[0], tracking_states.T[1], title=f'{act}')
+            adv = qval - tv
+            tracked_advs.append(adv)
+        tracked_advs = np.array(tracked_advs).reshape((n_tracking_dim, n_tracking_dim))
+        tracked_advs = np.flipud(np.rot90(tracked_advs))
+        make_heatmap(ax, tracked_advs, tracking_states.T[0], tracking_states.T[1], title=f'{act}')
         ax.add_patch(mpl.patches.Circle((0,0), env.GOAL, edgecolor='g', ls='--', facecolor='None', zorder=20))
 
     fig.suptitle(f'{repr(env)}\n'
                  f'Training step = {at_training_step}')
     # fig.tight_layout()
     plt.subplots_adjust(left=0.1, bottom=0.05, right=0.9, top=0.88, wspace=0.083, hspace=0.321)
-    plt.savefig(os.path.join(experiment_dir, f'individual_action_qvals_at-step-{at_training_step}.png'))
+    plt.savefig(os.path.join(experiment_dir, f'individual_action_advs_at-step-{at_training_step}.png'))
 
     fig, ax = plt.subplots()
     qvals = []
@@ -245,7 +250,7 @@ def plot_individual_action_qvals():
 
 
 def plot_compare_qvals_during_training():
-    experiment_dir = 'changing_policy_type/sarsa_091222_223617_5/boltz-1'
+    experiment_dir = 'changing_policy_type/sarsa_091322_005443_0/eps-greedy'
     experiment_name = os.path.split(experiment_dir)
 
     # env = REDA.load_from_dir(experiment_dir)
@@ -262,8 +267,10 @@ def plot_compare_qvals_during_training():
     # qs = [QValueFunctionTiles3.load(item) for item in q_func_filenames]
     nb_q_funcs = len(q_func_filenames)
 
-    query_training_step_start = 79500 - 1
-    query_training_step_finish = 80000- 1
+    # query_training_step_start = 79500 - 1
+    # query_training_step_finish = 80000- 1
+    query_training_step_start = 80000 - 1
+    query_training_step_finish = 80500 - 1
 
     qs = []
     actual_steps = []
@@ -330,5 +337,5 @@ def plot_compare_qvals_during_training():
 if __name__ == '__main__':
     # plot_q_vals_grid_tracking_states()
     # plot_q_vals_region_sampling_tracking_states()
-    # plot_individual_action_qvals()
-    plot_compare_qvals_during_training()
+    plot_individual_action_advs()
+    # plot_compare_qvals_during_training()

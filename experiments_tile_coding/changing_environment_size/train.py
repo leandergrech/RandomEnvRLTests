@@ -11,16 +11,28 @@ from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions
 
 
 def run_experiment(exp_name):
-    n_obs, n_act = 2, 2
-    state_clip = 0.0
-    env = REDAClip(n_obs, n_act, state_clip)
+    n_obses = [2, 3, 4, 5]
+    n_act = 2
     nb_actions = len(get_discrete_actions(n_act, 3))
 
-    eps_fun = LinearDecay(1.0, 0.0, 80000, label='EPS')
-    tau_fun1 = LinearDecay(10.0, 1e-2, 80000, label='TAU')
-    tau_fun2 = LinearDecay(5.0, 1e-2, 80000, label='TAU')
-    tau_fun3 = LinearDecay(1.0, 1e-2, 80000, label='TAU')
+    envs = []
+    init_funcs = []
+    for n_obs in n_obses:
+        env = REDA(n_obs, n_act)
+        envs.append(env)
+        def init_func():
+            init_state = np.zeros(n_obs)
+            env.reset(init_state)
+            while True:
+                a = np.random.choice(nb_actions)
+                otp1, *_ = env.step(a)
+                if np.sqrt(np.mean(np.square(otp1))) > 0.9:
+                    return otp1
+        init_funcs.append(init_func)
+
+    exp_fun = LinearDecay(1.0, 0.0, 80000, label='EPS')
     lr_fun = Constant(1e-1, label='LR')
+
     nb_tilings, nb_bins = 16, 2
     gamma = 0.9
 
@@ -31,23 +43,13 @@ def run_experiment(exp_name):
         else:
             return q.greedy_action(s)
 
-    def boltzmann(s, q, tau):
-        nonlocal nb_actions
-        qvals_exp = np.exp([q.value(s, a_)/tau for a_ in range(nb_actions)])
-        qvals_exp_sum = np.sum(qvals_exp)
-
-        cum_probas = np.cumsum(qvals_exp/qvals_exp_sum)
-        return np.searchsorted(cum_probas, np.random.rand())
-
-    sub_experiments_names = ['eps-greedy', 'boltz-10', 'boltz-5', 'boltz-1']
-    for experiment_name, policy, exp_fun in zip(sub_experiments_names,
-                                                (eps_greedy, boltzmann, boltzmann, boltzmann),
-                                                (eps_fun, tau_fun1, tau_fun2, tau_fun3)):
+    sub_experiments_names = [repr(env) for env in envs]
+    for experiment_name, env in zip(sub_experiments_names, envs):
         experiment_dir = os.path.join(exp_name, experiment_name)
         os.makedirs(experiment_dir)
 
         train_params = dict(
-            n_obs=n_obs,
+            n_obs=env.obs_dimension,
             n_act=n_act,
             env=env,
             nb_tilings=nb_tilings,
@@ -68,17 +70,17 @@ def run_experiment(exp_name):
 
         train_params['init_state_func'] = env.reset
         train_params['objective_func'] = env.objective
-        train_params['policy'] = policy
+        train_params['policy'] = eps_greedy
 
-        iht_counts, ep_lens, returns = train_instance(**train_params)
+        errors, ep_lens, iht_counts, lrs, env = train_instance(**train_params)
 
         with open(os.path.join(experiment_dir, 'training_stats.pkl'), 'wb') as f:
-            d = dict(iht_counts=iht_counts, ep_lens=ep_lens, returns=returns)
+            d = dict(errors=errors, ep_lens=ep_lens, iht_counts=iht_counts)
             pkl.dump(d, f)
 
 from multiprocessing import Pool
 if __name__ == '__main__':
-    nb_trials = 1
+    nb_trials = 16
     with Pool(8) as p:
         exp_prefix = dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S')
         p.map(run_experiment, [f'{exp_prefix}_{item}' for item in range(nb_trials)])

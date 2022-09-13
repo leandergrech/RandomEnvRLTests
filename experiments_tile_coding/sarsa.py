@@ -66,10 +66,9 @@ def train_instance(**kwargs):
     '''
     TRAINING LOOP
     '''
-    td_errors = np.zeros(nb_training_steps)
     all_ep_lens = []
+    all_returns = []
     iht_counts = []
-    lrs = []
 
     init_state_func = kwargs.get('init_state_func')
     objective_func = kwargs.get('objective_func')
@@ -87,8 +86,7 @@ def train_instance(**kwargs):
 
         # td_errors[T] = q.update(o, a, target, lr_fun(T))
         lr = lr_fun(T)
-        lrs.append(lr)
-        td_errors[T] = q.update(o, a, target, lr)
+        q.update(o, a, target, lr)
 
         if d:
             o = env.reset(init_state_func())
@@ -98,8 +96,9 @@ def train_instance(**kwargs):
             a = a_
 
         if (T + 1) % eval_every == 0:
-            eval_obses, ep_lens = eval_agent(eval_env, q, kwargs.get('eval_eps'))
+            _, ep_lens, returns = eval_agent(eval_env, q, kwargs.get('eval_eps'))
             all_ep_lens.append(ep_lens)
+            all_returns.append(returns)
             iht_counts.append(tilings.count())
             # make_state_violins(eval_obses['initial_observations'], eval_obses['terminal_observations'], os.path.join(results_path, 'obses_violins', f'step-{T}.png'))
         if (T + 1) % kwargs['save_every'] == 0 or T == 0:
@@ -111,7 +110,7 @@ def train_instance(**kwargs):
             save_path = os.path.join(save_dir, f'q_step_{T}.pkl')
             q.save(save_path)
 
-    return td_errors, all_ep_lens, iht_counts, lrs, env
+    return iht_counts, all_ep_lens, all_returns
 
 
 

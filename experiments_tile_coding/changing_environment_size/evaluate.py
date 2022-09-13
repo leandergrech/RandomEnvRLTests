@@ -62,7 +62,7 @@ def plot_all_experiments():
 
     # Iterate over experiment with different environment
     for exp_name in sorted(os.listdir(experiment_pardir)):
-        if 'sarsa' not in exp_name or exp_name != "sarsa_091322_184958_0":
+        if 'sarsa' not in exp_name:# or int(exp_name.split('_')[-1])>7:
             continue
 
         all_exp.append(exp_name)
