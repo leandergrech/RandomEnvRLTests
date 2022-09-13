@@ -158,9 +158,9 @@ def plot_q_vals_region_sampling_tracking_states():
 
 from tile_coding_re.heatmap_utils import make_heatmap
 from experiments_tile_coding.eval_utils import play_episode
-def plot_individual_action_advs():
+def plot_individual_action_advs(experiment_dir, query_step):
     # experiment_dir = get_latest_experiment()
-    experiment_dir = 'changing_policy_type/sarsa_091322_005443_0/boltz-5'
+    # experiment_dir = 'changing_policy_type/sarsa_091322_220631_0/boltz-5'
     experiment_name = os.path.split(experiment_dir)
 
     # env = REDA.load_from_dir(experiment_dir)
@@ -174,11 +174,9 @@ def plot_individual_action_advs():
     print('Searching for training data')
     q_func_filenames = get_q_func_filenames(experiment_dir)
     training_steps = [get_q_func_step(qfn) for qfn in q_func_filenames]
-    # qs = [QValueFunctionTiles3.load(item) for item in q_func_filenames]
-    nb_q_funcs = len(q_func_filenames)
 
-    query_training_step = 80000-1
-    qfn_at_step = q_func_filenames[np.searchsorted(training_steps, query_training_step)]
+    closest_training_step_idx = np.argmin(np.abs(np.subtract(training_steps, query_step)))
+    qfn_at_step = q_func_filenames[closest_training_step_idx]
     at_training_step = get_q_func_step(qfn_at_step)
 
     # Initialise grid tracking states
@@ -188,10 +186,11 @@ def plot_individual_action_advs():
     tracking_ranges = [[l, h] for l, h in zip(*tracking_ranges)]
     tracking_states = np.array(
         [list(item) for item in product(*np.array([np.linspace(l, h, n_tracking_dim) for l, h in tracking_ranges]))])
-    nb_tracked = len(tracking_states)
 
+    # Load Q-table
     q = QValueFunctionTiles3.load(qfn_at_step)
 
+    # Play test episodes to superimpose on heatmaps
     nb_test_eps = 3
     test_obses = []
     test_acts = []
@@ -203,50 +202,70 @@ def plot_individual_action_advs():
             if len(test_obses)>10:
                 break
 
+    # Estimate and store state values
     tracking_estimated_vals = []
     for ts in tracking_states:
         tracking_estimated_vals.append(np.mean([q.value(ts, a_) for a_ in range(nb_actions)]))
 
+    # Plot the fuckin shit already
     fig, axs = plt.subplots(3, 3, figsize=(15, 10))
     axs = np.ravel(axs)
+    min_adv = np.inf
+    max_adv = -np.inf
+    ims = []
     for action_idx, (ax, act) in enumerate(zip(axs, actions)):
         init_state = np.array([0.0, 0.0])
         env.reset(init_state.copy())
         otp1, *_ = env.step(act)
         ax.plot(*np.vstack([init_state, otp1]).T, c='k', marker='x', zorder=20)
 
+        # Plot test episodes
         for tobses, tacts in zip(test_obses, test_acts):
             tobses = np.array(tobses).T
             ax.plot(tobses[0], tobses[1], c='k', zorder=25)
 
-
+        # Calculate advantages
         tracked_advs = []
         for ts, tv in zip(tracking_states, tracking_estimated_vals):
             # ax.scatter(ts[0], ts[1], marker='o', c='k')
             qval = q.value(ts, action_idx)
             adv = qval - tv
             tracked_advs.append(adv)
+
+        # For clim to have the same range
+        min_adv = np.min([min_adv, *tracked_advs])
+        max_adv = np.max([min_adv, *tracked_advs])
+
+        # Magic fuckery to align array to correct heatmap orientation
         tracked_advs = np.array(tracked_advs).reshape((n_tracking_dim, n_tracking_dim))
         tracked_advs = np.flipud(np.rot90(tracked_advs))
-        make_heatmap(ax, tracked_advs, tracking_states.T[0], tracking_states.T[1], title=f'{act}')
+
+        # Heatmap plotting
+        im = make_heatmap(ax, tracked_advs, tracking_states.T[0], tracking_states.T[1], title=f'{act}')
+        ims.append(im)
         ax.add_patch(mpl.patches.Circle((0,0), env.GOAL, edgecolor='g', ls='--', facecolor='None', zorder=20))
 
-    fig.suptitle(f'{repr(env)}\n'
+    for im in ims:
+        im.set_clim((min_adv, max_adv))
+
+    fig.suptitle(f'Dir = {exp_dir}\nEnv = {repr(env)}\n'
                  f'Training step = {at_training_step}')
     # fig.tight_layout()
     plt.subplots_adjust(left=0.1, bottom=0.05, right=0.9, top=0.88, wspace=0.083, hspace=0.321)
-    plt.savefig(os.path.join(experiment_dir, f'individual_action_advs_at-step-{at_training_step}.png'))
+    save_path = os.path.join(experiment_dir, f'individual_action_advs_at-step-{at_training_step}.png')
+    plt.savefig(save_path)
+    print(f'Saved figure to: {save_path}')
 
-    fig, ax = plt.subplots()
-    qvals = []
-    for ts in tracking_states:
-        qvals.append(np.max([q.value(ts, a_) for a_ in range(nb_actions)]))
-    qvals = np.array(qvals).reshape((n_tracking_dim, n_tracking_dim))
-    qvals = np.flipud(np.rot90(qvals))
-    make_heatmap(ax, qvals, tracking_states.T[0], tracking_states.T[1], title='Estimated values')
-    ax.add_patch(mpl.patches.Circle((0, 0), env.GOAL, edgecolor='g', ls='--', facecolor='None', zorder=20))
-    plt.savefig(os.path.join(experiment_dir, f'vals_at-step-{at_training_step}.png'))
-    # plt.show()
+    # fig, ax = plt.subplots()
+    # qvals = []
+    # for ts in tracking_states:
+    #     qvals.append(np.max([q.value(ts, a_) for a_ in range(nb_actions)]))
+    # qvals = np.array(qvals).reshape((n_tracking_dim, n_tracking_dim))
+    # qvals = np.flipud(np.rot90(qvals))
+    # make_heatmap(ax, qvals, tracking_states.T[0], tracking_states.T[1], title='Estimated values')
+    # ax.add_patch(mpl.patches.Circle((0, 0), env.GOAL, edgecolor='g', ls='--', facecolor='None', zorder=20))
+    # plt.savefig(os.path.join(experiment_dir, f'vals_at-step-{at_training_step}.png'))
+    # # plt.show()
 
 
 def plot_compare_qvals_during_training():
@@ -337,5 +356,10 @@ def plot_compare_qvals_during_training():
 if __name__ == '__main__':
     # plot_q_vals_grid_tracking_states()
     # plot_q_vals_region_sampling_tracking_states()
-    plot_individual_action_advs()
+    sub_exps = ['eps-greedy', 'boltz-1', 'boltz-5', 'boltz-10']
+    exp_dir = 'changing_policy_type/sarsa_091322_222326_0'
+    at_step = 80000
+    for sub_exp in sub_exps:
+        exp_path = os.path.join(exp_dir, sub_exp)
+        plot_individual_action_advs(exp_path, at_step)
     # plot_compare_qvals_during_training()

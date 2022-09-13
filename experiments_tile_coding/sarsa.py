@@ -96,7 +96,7 @@ def train_instance(**kwargs):
             a = a_
 
         if (T + 1) % eval_every == 0:
-            _, ep_lens, returns = eval_agent(eval_env, q, kwargs.get('eval_eps'))
+            _, returns, ep_lens = eval_agent(eval_env, q, kwargs.get('eval_eps'))
             all_ep_lens.append(ep_lens)
             all_returns.append(returns)
             iht_counts.append(tilings.count())
