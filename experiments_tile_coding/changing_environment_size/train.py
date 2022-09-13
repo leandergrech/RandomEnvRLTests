@@ -9,6 +9,23 @@ from training_utils import ExponentialDecay, Constant, get_training_utils_yaml_d
 from experiments_tile_coding.sarsa import train_instance; algo_name = 'sarsa'
 from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA, REDAClip, get_discrete_actions
 
+class InitFunc:
+    def __init__(self, env):
+        self.env = env
+        self.nb_actions = len(get_discrete_actions(env.act_dimension, 3))
+
+    def __call__(self, *args, **kwargs):
+        '''
+                    Ensures that if n_obs>n_act, the trim will lie on a solvable plane
+                    '''
+        init_state = np.zeros(self.env.obs_dimension)
+        self.env.reset(init_state.copy())
+        while True:
+            a = np.random.choice(self.nb_actions)
+            otp1, *_ = self.env.step(a)
+            if np.sqrt(np.mean(np.square(otp1))) > 0.9:
+                return otp1
+
 
 def run_experiment(exp_name):
     n_obses = [2, 3, 4, 5]
@@ -20,14 +37,8 @@ def run_experiment(exp_name):
     for n_obs in n_obses:
         env = REDA(n_obs, n_act)
         envs.append(env)
-        def init_func():
-            init_state = np.zeros(n_obs)
-            env.reset(init_state)
-            while True:
-                a = np.random.choice(nb_actions)
-                otp1, *_ = env.step(a)
-                if np.sqrt(np.mean(np.square(otp1))) > 0.9:
-                    return otp1
+
+        init_func = InitFunc(env)
         init_funcs.append(init_func)
 
     exp_fun = LinearDecay(1.0, 0.0, 80000, label='EPS')
@@ -44,7 +55,7 @@ def run_experiment(exp_name):
             return q.greedy_action(s)
 
     sub_experiments_names = [repr(env) for env in envs]
-    for experiment_name, env in zip(sub_experiments_names, envs):
+    for experiment_name, env, init_func in zip(sub_experiments_names, envs, init_funcs):
         experiment_dir = os.path.join(exp_name, experiment_name)
         os.makedirs(experiment_dir)
 
@@ -58,7 +69,7 @@ def run_experiment(exp_name):
             results_path=experiment_dir,
             lr_fun=lr_fun,
             exp_fun=exp_fun,
-            nb_training_steps=100000,
+            nb_training_steps=1000,
             eval_every=500,
             eval_eps=20,
             save_every=500,
@@ -68,22 +79,22 @@ def run_experiment(exp_name):
         with open(os.path.join(experiment_dir, "train_params.yml"), "w") as f:
             f.write(yaml.dump(train_params, Dumper=get_training_utils_yaml_dumper()))
 
-        train_params['init_state_func'] = env.reset
+        train_params['init_state_func'] = init_func
         train_params['objective_func'] = env.objective
         train_params['policy'] = eps_greedy
 
-        errors, ep_lens, iht_counts, lrs, env = train_instance(**train_params)
+        iht_counts, ep_lens, returns = train_instance(**train_params)
 
         with open(os.path.join(experiment_dir, 'training_stats.pkl'), 'wb') as f:
-            d = dict(errors=errors, ep_lens=ep_lens, iht_counts=iht_counts)
+            d = dict(ep_lens=ep_lens, iht_counts=iht_counts, returns=returns)
             pkl.dump(d, f)
 
 from multiprocessing import Pool
 if __name__ == '__main__':
-    nb_trials = 16
-    with Pool(8) as p:
-        exp_prefix = dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S')
-        p.map(run_experiment, [f'{exp_prefix}_{item}' for item in range(nb_trials)])
-    # exp_prefix = dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S')
-    # run_experiment(exp_prefix)
+    # nb_trials = 1
+    # with Pool(8) as p:
+    #     exp_prefix = dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S')
+    #     p.map(run_experiment, [f'{exp_prefix}_{item}' for item in range(nb_trials)])
+    exp_prefix = dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S')
+    run_experiment(exp_prefix)
 
