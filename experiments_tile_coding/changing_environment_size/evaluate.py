@@ -3,11 +3,12 @@ import pickle as pkl
 import matplotlib.pyplot as plt
 import numpy as np
 from pandas import Series
-
+from collections import defaultdict
 
 def unpack_stats(arr, key, rolling):
     s = Series([item[key] for item in arr])
     return s.rolling(rolling).mean()
+
 
 def plot_individual_experiments(experiment_pardir):
     # experiment_pardir = 'sarsa_090222_020057'
@@ -46,13 +47,17 @@ def plot_individual_experiments(experiment_pardir):
     plt.savefig(os.path.join(experiment_pardir, 'QO_vs_RO/results.png'))
     # plt.show()
 
-from collections import defaultdict
+
 def plot_all_experiments():
     experiment_pardir = '.'
-    sub_experiments_pardirs = ['eps-greedy', 'boltz-10', 'boltz-5', 'boltz-1']
-    sub_experiments_labels = ['Eps-greedy', 'Boltz10', 'Boltz5', 'Boltz1']
+    # sub_experiments_pardirs = ['REDA_2obsx2act', 'REDA_3obsx2act', 'REDA_4obsx2act', 'REDA_5obsx2act']
+    # sub_experiments_labels = ['REDA_2x2', 'REDA_3x2', 'REDA_4x2', 'REDA_5x2']
+    # sub_experiments_pardirs = ['REDA_3obsx2act', 'REDA_4obsx2act', 'REDA_5obsx2act']
+    sub_experiments_pardirs = ['REDAClip_1.0clip_3obsx2act', 'REDAClip_1.0clip_4obsx2act', 'REDAClip_1.0clip_5obsx2act']
+    sub_experiments_labels = ['REDA_3x2', 'REDA_4x2', 'REDA_5x2']
 
     # ep_lens = defaultdict(lambda : defaultdict(list))
+    returns = defaultdict(list)
     ep_lens = defaultdict(list)
     iht_counts = defaultdict(list)
     xrange = None
@@ -62,7 +67,7 @@ def plot_all_experiments():
 
     # Iterate over experiment with different environment
     for exp_name in sorted(os.listdir(experiment_pardir)):
-        if 'sarsa' not in exp_name:# or int(exp_name.split('_')[-1])>7:
+        if 'sarsa' not in exp_name:# or "sarsa_091422_191149" not in exp_name:
             continue
 
         all_exp.append(exp_name)
@@ -74,8 +79,8 @@ def plot_all_experiments():
             with open(pkl_file, 'rb') as f:
                 data = pkl.load(f)
 
+                returns[sub_exp].append(data['returns'])
                 ep_lens[sub_exp].append(data['ep_lens'])
-
                 iht_counts[sub_exp].append(data['iht_counts'])
 
                 if xrange is None:
@@ -83,9 +88,12 @@ def plot_all_experiments():
 
     print(f'Found {len(all_exp)} experiments')
 
-    fig, axs = plt.subplots(2, gridspec_kw=dict(height_ratios=[1, 3]), figsize=(15, 10))
-    # for label, sub_exp, c in zip(('Quadratic', 'RMS'), sub_experiments_pardirs, ('b', 'k')):
+    fig, axs = plt.subplots(3, gridspec_kw=dict(height_ratios=[1, 3, 3]), figsize=(15, 10))
     for label, sub_exp, c in zip(sub_experiments_labels, sub_experiments_pardirs, ('b', 'g', 'r', 'k')):
+        rets = returns[sub_exp]
+        rets_mean = np.mean(np.mean(rets, axis=-1), axis=0)
+        rets_std = np.sqrt(np.mean(np.square(np.std(rets, axis=-1)), axis=0))
+
         els = ep_lens[sub_exp]
         el_mean = np.mean(np.mean(els, axis=-1), axis=0)
         el_std = np.sqrt(np.mean(np.square(np.std(els, axis=-1)), axis=0))
@@ -109,15 +117,26 @@ def plot_all_experiments():
         ax.plot(xrange, el_mean+el_std, ls='dashed', c=c, label=f'{label} ' + r'$\mu+\sigma$')
         ax.set_title('Using greedy policy')
         ax.set_ylabel('Episode length')
+
+        ax = axs[2]
+        ax.plot(xrange, rets_mean, ls='solid', c=c, label=f'{label} ' + r'$\mu$')
+        # ax.plot(xrange, rets_mean - rets_std, ls='dotted', c=c, label=f'{label} ' + r'$\mu-\sigma$')
+        # ax.plot(xrange, rets_mean + rets_std, ls='dashed', c=c, label=f'{label} ' + r'$\mu+\sigma$')
+        ax.set_yscale('symlog')
+        ax.minorticks_on()
+        ax.grid(visible=True, which='major', axis='y')
+        ax.yaxis.grid(visible=True, which='minor', c='gray', ls='--')
+        ax.set_ylabel('Returns')
         # ax.set_yscale('log')
         # ax.set_xscale('log')
 
     for ax in axs:
         ax.legend(loc='best', prop=dict(size=10))
         ax.set_xlabel('Training steps')
-    fig.suptitle(f'Changin type of policy\n{len(all_exp)} different environments')
+    fig.suptitle(f'Changing type of policy over\n{len(all_exp)} different environments')
     fig.tight_layout()
     plt.savefig(os.path.join(experiment_pardir, 'results.png'))
+
 
 if __name__ == '__main__':
     # plot_individual_experiments('sarsa_090522_233119')

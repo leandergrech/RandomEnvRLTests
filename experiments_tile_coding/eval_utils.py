@@ -87,6 +87,28 @@ def get_optimal_ep_len(env):
         ep_lens.append(t)
     return np.mean(ep_lens)
 
+
+get_q_func_step = lambda item: int(os.path.split(item)[-1].split('_')[2].split('.')[0])
+
+
+def get_q_func_filenames(experiment_dir):
+    q_func_dir = os.path.join(experiment_dir, 'q_func')
+    q_func_filenames = [fn for fn in os.listdir(q_func_dir)]
+
+    q_func_filenames = sorted(q_func_filenames, key=get_q_func_step)
+    q_func_filenames = [os.path.join(q_func_dir, item) for item in q_func_filenames]
+
+    return q_func_filenames
+
+
+def get_q_func_xrange(q_func_filenames):
+    return np.linspace(get_q_func_step(q_func_filenames[0]), get_q_func_step(q_func_filenames[-1]), len(q_func_filenames))
+
+
+def get_val(qvf, state, nb_actions):
+    return np.mean([qvf.value(state, a_) for a_ in range(nb_actions)])
+
+
 if __name__ == '__main__':
     from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA
     from tqdm import trange

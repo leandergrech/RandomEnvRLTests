@@ -7,6 +7,8 @@ import pickle as pkl
 from tqdm import tqdm as pbar
 from tile_coding_re.tiles3_qfunction import QValueFunctionTiles3
 from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA, get_discrete_actions, REDAClip
+from tile_coding_re.heatmap_utils import make_heatmap
+from experiments_tile_coding.eval_utils import play_episode
 
 def get_latest_experiment():
     lab_dir = '/home/leander/code/RandomEnvRLTests/experiments_tile_coding/'
@@ -20,22 +22,9 @@ def get_latest_experiment():
 
     return os.path.join(lab_dir, experiment_name)
 
-get_q_func_step = lambda item: int(os.path.split(item)[-1].split('_')[2].split('.')[0])
 
-def get_q_func_filenames(experiment_dir):
-    q_func_dir = os.path.join(experiment_dir, 'q_func')
-    q_func_filenames = [fn for fn in os.listdir(q_func_dir)]
+from eval_utils import get_q_func_filenames, get_q_func_xrange, get_val, get_q_func_step
 
-    q_func_filenames = sorted(q_func_filenames, key=get_q_func_step)
-    q_func_filenames = [os.path.join(q_func_dir, item) for item in q_func_filenames]
-
-    return q_func_filenames
-
-def get_q_func_xrange(q_func_filenames):
-    return np.linspace(get_q_func_step(q_func_filenames[0]), get_q_func_step(q_func_filenames[-1]), len(q_func_filenames))
-
-def get_val(qvf, state, nb_actions):
-    return max([qvf.value(state, a_) for a_ in range(nb_actions)])
 
 def plot_q_vals_grid_tracking_states():
     experiment_dir = get_latest_experiment()
@@ -47,6 +36,7 @@ def plot_q_vals_grid_tracking_states():
 
     q_func_filenames = get_q_func_filenames(experiment_dir)
     nb_q_funcs = len(q_func_filenames)
+    xrange = get_q_func_xrange(q_func_filenames)
 
     # Initialise grid tracking states
     n_tracking_dim = 5
@@ -60,7 +50,7 @@ def plot_q_vals_grid_tracking_states():
         for i, ts in enumerate(tracking_states):
             vals[i,j] = get_val(q, ts, nb_actions)
 
-    xrange = get_q_func_xrange(q_func_filenames)
+
     fig, axs = plt.subplots(2, gridspec_kw=dict(height_ratios=[1,2]))
     cmap = mpl.cm.get_cmap('tab10')
     cmap_x = np.linspace(0, 1, nb_tracked)
@@ -91,39 +81,43 @@ def circular_normal_sample(r, s):
     else:
         return np.random.normal(r, s, 2)
 
-def circular_uniform_sample(rlow, rhigh):
-    R = np.random.uniform(rlow, rhigh)
-    theta = 2 * np.pi * np.random.rand()
-    return [R * np.cos(theta), R * np.sin(theta)]
 
-def plot_q_vals_region_sampling_tracking_states():
-    experiment_dir = get_latest_experiment()
-    experiment_name = os.path.split(experiment_dir)
+def nball_uniform_sample(dim, rlow, rhigh):
+    X = np.random.uniform(-1, 1, dim)
+    R = np.sqrt(np.sum(np.square(X))) # Sampled point lies on n-ball with radius R
+    X /= R # Now point lies on unit n-ball surface
 
-    env = REDA.load_from_dir(experiment_dir)
+    M = np.random.uniform(rlow, rhigh) # Magnitude sampled from uni. dist. to get rlow-rhigh band
+    return X * M
+    #
+    # theta = 2 * np.pi * np.random.rand()
+    # return [R * np.cos(theta), R * np.sin(theta)]
+
+
+def plot_q_vals_region_sampling_tracking_states(experiment_dir):
+    env = REDAClip.load_from_dir(experiment_dir)
+    n_obs = env.obs_dimension
     actions = get_discrete_actions(env.act_dimension, 3)
     nb_actions = len(actions)
 
     print('Searching for training data')
     q_func_filenames = get_q_func_filenames(experiment_dir)
-    # qs = [QValueFunctionTiles3.load(item) for item in q_func_filenames]
-    nb_q_funcs = len(q_func_filenames)
+    xrange = get_q_func_xrange(q_func_filenames)
 
     print('Creating tracking regions')
     nb_samples_per_region = 200
-    # s = 0.02 # normal
-    rstep = 0.2 # uniform
+    nb_regions = 5
+    rstep = 1 / nb_regions
+
     tracking_states = []
-    # for r in np.arange(0, 1, 0.2): # normal
-    for r in np.arange(5):
+    for r in np.arange(nb_regions):
         for i in range(nb_samples_per_region):
-            # ts = circular_normal_sample(r, s) # normal
-            ts = circular_uniform_sample(rlow=r * rstep, rhigh=r * rstep + rstep)
+            ts = nball_uniform_sample(n_obs, rlow=r * rstep, rhigh=r * rstep + rstep)
             tracking_states.append(ts)
     nb_tracked = len(tracking_states)
 
     print('Estimating values at tracked states')
-    tracked_vals = [[] for _ in range(nb_tracked)]
+    tracked_vals = [[] for _ in range(nb_tracked)] # shape=(nb_tracked, len(q_func_filenames))
     for qfn in pbar(q_func_filenames):
         q = QValueFunctionTiles3.load(qfn)
         for i, ts in enumerate(tracking_states):
@@ -131,8 +125,10 @@ def plot_q_vals_region_sampling_tracking_states():
 
     print('Plotting')
     fig, axs = plt.subplots(2, figsize=(15,10))
+    fig.suptitle(experiment_dir)
     cmap = mpl.cm.get_cmap('jet')
-    region_color = lambda i: cmap((i // nb_samples_per_region) * nb_samples_per_region/(nb_tracked - nb_samples_per_region))
+    region_color = lambda i: cmap((i // nb_samples_per_region)
+                                  * nb_samples_per_region/(nb_tracked - nb_samples_per_region)) # Separates regions by colour
     ax = axs[0]
     ax.set_xlabel('State dimension 0')
     ax.set_ylabel('State dimension 1')
@@ -142,22 +138,28 @@ def plot_q_vals_region_sampling_tracking_states():
     ax = axs[1]
     ax.set_xlabel('Training steps')
     ax.set_ylabel('Estimated values')
-    xrange = get_q_func_xrange(q_func_filenames)
     for val_idx in np.arange(0, nb_tracked, nb_samples_per_region):
-        vals = tracked_vals[val_idx:val_idx+nb_samples_per_region]
-        vals_med = np.median(vals, axis=0)
+        vals = tracked_vals[val_idx:val_idx+nb_samples_per_region]  # split per region
         vals_min = np.min(vals, axis=0)
         vals_max = np.max(vals, axis=0)
-        label = 'Median' if val_idx == 0 else None
-        ax.plot(xrange, vals_med, c=region_color(val_idx), lw=1.0, label=label)
-        label = 'Min-Max' if val_idx == 0 else None
-        ax.fill_between(xrange, vals_min, vals_max, color=region_color(val_idx), alpha=0.2, label=label)
+        vals_mean = np.mean(vals, axis=0)
+        vals_std = np.std(vals, axis=0)
+        vals_lower = vals_mean - vals_std
+        vals_upper = vals_mean + vals_std
+        label = 'Mean' if val_idx == 0 else None
+        ax.plot(xrange, vals_mean, c=region_color(val_idx), lw=1.0, label=label)
+        c = region_color(val_idx)
+        label = '$min\\rightarrow -\sigma$' if val_idx == 0 else None
+        ax.fill_between(xrange, vals_min, vals_lower, edgecolor=c, facecolor='None', hatch='//', label=label, alpha=0.4)
+        label = '$-\sigma\\rightarrow\sigma$' if val_idx == 0 else None
+        ax.fill_between(xrange, vals_lower, vals_upper, facecolor=c, alpha=0.2, label=label)
+        label = '$\sigma\\rightarrow max$' if val_idx == 0 else None
+        ax.fill_between(xrange, vals_upper, vals_max, edgecolor=c, facecolor='None', hatch='\\\\', label=label, alpha=0.4)
     ax.legend(loc='best')
     plt.savefig(os.path.join(experiment_dir, 'tracked_vals_per_region.png'))
     plt.show()
 
-from tile_coding_re.heatmap_utils import make_heatmap
-from experiments_tile_coding.eval_utils import play_episode
+
 def plot_individual_action_advs(experiment_dir, query_step):
     # experiment_dir = get_latest_experiment()
     # experiment_dir = 'changing_policy_type/sarsa_091322_220631_0/boltz-5'
@@ -195,7 +197,7 @@ def plot_individual_action_advs(experiment_dir, query_step):
     test_obses = []
     test_acts = []
     for _ in range(nb_test_eps):
-        obses, acts, _ = play_episode(env, q, circular_uniform_sample(0.8, 0.9))
+        obses, acts, _ = play_episode(env, q, nball_uniform_sample(0.8, 0.9))
         if len(obses)>50:
             test_obses.append(obses)
             test_acts.append(acts)
@@ -356,10 +358,12 @@ def plot_compare_qvals_during_training():
 if __name__ == '__main__':
     # plot_q_vals_grid_tracking_states()
     # plot_q_vals_region_sampling_tracking_states()
-    sub_exps = ['eps-greedy', 'boltz-1', 'boltz-5', 'boltz-10']
-    exp_dir = 'changing_policy_type/sarsa_091322_222326_0'
-    at_step = 80000
-    for sub_exp in sub_exps:
-        exp_path = os.path.join(exp_dir, sub_exp)
-        plot_individual_action_advs(exp_path, at_step)
+
+    # sub_exps = ['eps-greedy', 'boltz-1', 'boltz-5', 'boltz-10']
+    exp_dir = 'changing_environment_size/exp1/sarsa_091422_214300_0/REDAClip_1.0clip_5obsx2act'
+    # at_step = 80000
+    # for sub_exp in sub_exps:
+    #     exp_path = os.path.join(exp_dir, sub_exp)
+        # plot_individual_action_advs(exp_path, at_step)
+    plot_q_vals_region_sampling_tracking_states(exp_dir)
     # plot_compare_qvals_during_training()

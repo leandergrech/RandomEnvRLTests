@@ -1,3 +1,5 @@
+import os
+import re
 from itertools import product
 import gym
 import numpy as np
@@ -133,6 +135,18 @@ class REDAClip(RandomEnvDiscreteActions):
 
     def __repr__(self):
         return f'REDAClip_{self.state_clip}clip_{self.obs_dimension}obsx{self.act_dimension}act'
+
+    @classmethod
+    def load_from_dir(cls, load_dir):
+        for file in os.listdir(load_dir):
+            if RandomEnv.SAVED_MODEL_SUFFIX in file:
+                state_clip, n_obs, n_act = re.findall(r'[-+]?(?:\d*\.\d+|\d+)', file)
+                self = cls(int(n_obs), int(n_act), state_clip=float(state_clip), estimate_scaling=False)
+                self.load_dynamics(load_dir)
+
+                return self
+
+        return None
 
     @classmethod
     def to_yaml(cls, dumper, env_instance):

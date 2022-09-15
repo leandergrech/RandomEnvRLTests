@@ -74,10 +74,12 @@ def plot_all_experiments():
             pkl_file = os.path.join(experiment_dir, sub_exp, 'training_stats.pkl')
             with open(pkl_file, 'rb') as f:
                 data = pkl.load(f)
-
-                returns[sub_exp].append(data['returns'])
-                ep_lens[sub_exp].append(data['ep_lens'])
-                iht_counts[sub_exp].append(data['iht_counts'])
+                try:
+                    returns[sub_exp].append(data['returns'])
+                    ep_lens[sub_exp].append(data['ep_lens'])
+                    iht_counts[sub_exp].append(data['iht_counts'])
+                except Exception as e:
+                    print(experiment_dir, sub_exp)
 
                 if xrange is None:
                     xrange = np.arange(len(data['iht_counts'])) * eval_every
