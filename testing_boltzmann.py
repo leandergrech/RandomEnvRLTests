@@ -16,7 +16,7 @@ fig, ax = plt.subplots()
 samples = []
 # taus = np.linspace(1, 1e-2, 10)
 taus = [1.0, 0.5, 0.1, 0.05, 0.02, 0.01]
-tasu = [item for item in reversed(taus)]
+taus = [item for item in reversed(taus)]
 for i, tau in enumerate(taus):
     samples.append([boltz() for _ in range(1000)])
 
