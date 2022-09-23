@@ -8,6 +8,13 @@ from tqdm import tqdm
 from random_env.envs import VREDA, RandomEnvDiscreteActions as REDA
 
 
+"""
+Implementation of Adaptive Tiling where we start with coarse tiles and split them up depending on
+a predefined criterion. Some hacking to set up criterion in this implementation, but it's been
+tried and tested and the code works if you're interested in pursuing this path of research.
+"""
+
+
 class AdaptiveTile:
     count = 0
     def __init__(self, ranges:list, nb_actions, with_sub_tiles=True):

@@ -2,14 +2,12 @@ import os
 import numpy as np
 from datetime import datetime as dt
 import yaml
-import matplotlib.pyplot as plt
-import matplotlib as mpl
 import pickle as pkl
 from multiprocessing import Pool
 
-from training_utils import ExponentialDecay, Constant, get_training_utils_yaml_dumper, LinearDecay, StepDecay, circular_initial_state_distribution_2d
+from utils.training_utils import Constant, get_training_utils_yaml_dumper, LinearDecay
 from experiments_tile_coding.sarsa import train_instance; algo_name = 'sarsa'
-from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA, REDAClip, get_discrete_actions
+from random_env.envs.random_env_discrete_actions import REDAClip, get_discrete_actions
 
 class InitFunc:
     def __init__(self, env):

@@ -4,9 +4,14 @@ import matplotlib.pyplot as plt
 from tqdm import trange
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
 from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
-from tile_coding_re.heatmap_utils import make_heatmap, update_heatmap
+from utils.heatmap_utils import make_heatmap, update_heatmap
 # from tile_coding_re.training_utils import lr
 from copy import deepcopy
+
+"""
+Test script using Tilings and QValueFunctionTiles3 classes with REDA environment and Q-learning.
+Detailed real-time plotting during training.
+"""
 
 '''
 Environment info

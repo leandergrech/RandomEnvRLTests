@@ -77,8 +77,6 @@ def hashcoords(coordinates, m, readonly=False):
 from math import floor, log
 from itertools import zip_longest
 
-import numpy as np
-
 
 def tiles(ihtORsize, numtilings, floats, ints=[], readonly=False):
     """returns num-tilings tile indices corresponding to the floats and ints"""

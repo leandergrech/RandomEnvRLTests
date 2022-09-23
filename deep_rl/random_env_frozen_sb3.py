@@ -186,7 +186,7 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
 
 
 COMET_WORKSPACE = 'testing-ppo-trpo'
-COMMON_ENV_DIR = 'identity_envs'
+COMMON_ENV_DIR = '../identity_envs'
 algo = 'TRPO'
 
 if 'PPO' in algo:

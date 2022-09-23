@@ -2,6 +2,9 @@ import os
 import pickle as pkl
 from tile_coding_re.tiles3 import IHT, tiles, tilesclip
 
+"""
+Workhorse classes used in training tabular RL algorithms on REDA-type environments 
+"""
 
 class Tilings:
     def __init__(self, nb_tilings, nb_bins, feature_ranges, max_tiles):

@@ -6,7 +6,7 @@ from itertools import product
 
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
 from rl_utils.buffers import TrajBuffer
-from training_utils import lr, play_ep_get_obs
+from utils.training_utils import lr, play_ep_get_obs
 from random_env.envs import RandomEnvDiscreteActions, get_discrete_actions
 
 np.random.seed(123)

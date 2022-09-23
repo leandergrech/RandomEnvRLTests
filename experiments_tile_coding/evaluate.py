@@ -10,9 +10,9 @@ from tqdm import tqdm as pbar
 import re
 
 from tile_coding_re.tiles3_qfunction import QValueFunctionTiles3
-from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA, get_discrete_actions, REDAClip
-from tile_coding_re.heatmap_utils import make_heatmap
-from experiments_tile_coding.eval_utils import play_episode, get_latest_experiment
+from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA, get_discrete_actions
+from utils.heatmap_utils import make_heatmap
+from experiments_tile_coding.eval_utils import play_episode
 
 from eval_utils import get_q_func_filenames, get_q_func_xrange, get_val, get_q_func_step
 

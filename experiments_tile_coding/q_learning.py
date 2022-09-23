@@ -1,10 +1,7 @@
 import os
-import yaml
 from datetime import datetime as dt
-import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import pandas as pd
 import warnings
 warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 
@@ -12,7 +9,7 @@ warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
 from experiments_tile_coding.eval_utils import eval_agent, make_state_violins
-from training_utils import *#ExponentialDecay, get_training_utils_yaml_dumper
+from utils.training_utils import *#ExponentialDecay, get_training_utils_yaml_dumper
 
 from tqdm import trange
 

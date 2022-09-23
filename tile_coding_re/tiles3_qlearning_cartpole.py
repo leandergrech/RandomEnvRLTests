@@ -6,9 +6,14 @@ from tqdm import trange
 from pandas import Series
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
 from random_env.envs import get_discrete_actions
-from tile_coding_re.heatmap_utils import make_heatmap, update_heatmap
+from utils.heatmap_utils import make_heatmap, update_heatmap
 # from tile_coding_re.training_utils import lr
 import gym
+
+"""
+Test script using Tilings and QValueFunctionTiles3 classes with CartPole environment and Q-learning.
+Detailed real-time plotting during training.
+"""
 
 env = gym.make('CartPole-v1')
 eval_env = gym.make('CartPole-v1')

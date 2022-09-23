@@ -1,5 +1,5 @@
 import torch as t
-from my_agents_utils import timeit
+from deep_rl.my_agents_utils import timeit
 
 arr = t.rand(10000).reshape(1000, 10)
 

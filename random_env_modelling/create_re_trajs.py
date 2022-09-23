@@ -1,8 +1,7 @@
 import os
 import numpy as np
-import torch as th
 from random_env.envs import RandomEnv
-from my_agents_utils import make_path_exist, compute_returns
+from deep_rl.my_agents_utils import make_path_exist, compute_returns
 
 from constants import DISCOUNT, NB_TRAJS, DATA_DIR_NAME
 

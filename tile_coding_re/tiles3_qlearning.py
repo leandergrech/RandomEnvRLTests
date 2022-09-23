@@ -7,6 +7,11 @@ from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
 from random_env.envs import get_discrete_actions, RandomEnvDiscreteActions as REDA
 import gym
 
+"""
+Learning how to use Tilings and QValueFunctionTiles3 classes with REDA and Q-learning
+"""
+
+
 # env_name = 'MountainCar-v0'
 # env = gym.make(env_name)
 # env_lows, env_highs = env.observation_space.low, env.observation_space.high

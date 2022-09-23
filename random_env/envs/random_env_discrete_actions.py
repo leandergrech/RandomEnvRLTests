@@ -1,8 +1,10 @@
 import os
 import re
 from itertools import product
-import gym
+import yaml
 import numpy as np
+import gym
+
 from random_env.envs import RandomEnv
 
 
@@ -12,7 +14,7 @@ def get_discrete_actions(n_act, act_dim=3):
         all_actions = [item[0] for item in all_actions]
     return all_actions
 
-import yaml
+
 class RandomEnvDiscreteActions(RandomEnv, yaml.YAMLObject):
     """
     Model dynamics creation follows that of RandomEnv exactly.
@@ -102,16 +104,6 @@ class RandomEnvDiscreteActions(RandomEnv, yaml.YAMLObject):
             'trim_stats': env_instance.trim_stats
         })
 
-yaml.SafeDumper.add_representer(RandomEnvDiscreteActions, RandomEnvDiscreteActions.to_yaml)
-
-class REDAX(RandomEnvDiscreteActions):
-    def __init__(self, n_obs, n_act, **kwargs):
-        super(REDAX, self).__init__(n_obs, n_act, **kwargs)
-        self.actions = get_discrete_actions(n_act, 3)
-        self.action_space = gym.spaces.Discrete(len(self.actions))
-
-    def step(self, action):
-        return super(REDAX, self).step(self.actions[action])
 
 class REDAClip(RandomEnvDiscreteActions):
     yaml_tag = '!REDAClip'
@@ -158,7 +150,20 @@ class REDAClip(RandomEnvDiscreteActions):
             'pi': env_instance.pi.tolist(),
             'trim_stats': env_instance.trim_stats
         })
+
+
+yaml.SafeDumper.add_representer(RandomEnvDiscreteActions, RandomEnvDiscreteActions.to_yaml)
 yaml.SafeDumper.add_representer(REDAClip, REDAClip.to_yaml)
+
+
+class REDAX(RandomEnvDiscreteActions):
+    def __init__(self, n_obs, n_act, **kwargs):
+        super(REDAX, self).__init__(n_obs, n_act, **kwargs)
+        self.actions = get_discrete_actions(n_act, 3)
+        self.action_space = gym.spaces.Discrete(len(self.actions))
+
+    def step(self, action):
+        return super(REDAX, self).step(self.actions[action])
 
 
 class VREDA(RandomEnvDiscreteActions):
@@ -205,4 +210,3 @@ class VREDA(RandomEnvDiscreteActions):
         else:
             working_state = state[:self.obs_dimension]
         return super(VREDA, self).get_optimal_action(working_state, state_clip)
-

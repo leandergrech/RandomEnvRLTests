@@ -1,11 +1,10 @@
 import os
-import numpy as np
 from datetime import datetime as dt
 import yaml
-import matplotlib.pyplot as plt
 import pickle as pkl
 
-from training_utils import ExponentialDecay, Constant, get_training_utils_yaml_dumper, LinearDecay, StepDecay, circular_initial_state_distribution_2d
+from utils.training_utils import Constant, get_training_utils_yaml_dumper, LinearDecay, \
+    circular_initial_state_distribution_2d
 from experiments_tile_coding.sarsa import train_instance; algo_name = 'sarsa'
 from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA
 

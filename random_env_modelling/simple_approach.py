@@ -2,12 +2,11 @@ import os
 import numpy as np
 from datetime import datetime as dt
 from collections import deque
-import comet_ml
 import torch as t
 from torch.optim import SGD
 
 from random_env.envs import RandomEnv
-from my_agents_utils import MLP, get_writer
+from deep_rl.my_agents_utils import MLP, get_writer
 from constants import NB_TRAJS, DATA_DIR_NAME
 
 COMET_WORKSPACE = "re_modelling"

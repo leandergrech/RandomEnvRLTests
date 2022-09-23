@@ -1,9 +1,13 @@
 from numpy import linspace
 from numpy.random import randn
 from tiles3 import tiles, IHT, tilesasymmetric
-from heatmap_utils import *
-from training_utils import lr
+from utils.heatmap_utils import *
+from utils.training_utils import lr
 
+
+"""
+Playground for testing methods in [tiles3.py]
+"""
 
 def actual_func(x, y):
     # return sign(x*y)

@@ -5,7 +5,7 @@ import yaml
 import matplotlib.pyplot as plt
 import pickle as pkl
 
-from training_utils import ExponentialDecay, Constant, get_training_utils_yaml_dumper, LinearDecay, StepDecay
+from utils.training_utils import Constant, get_training_utils_yaml_dumper, LinearDecay
 from experiments_tile_coding.sarsa import train_instance; algo_name = 'sarsa'
 
 if __name__ == '__main__':

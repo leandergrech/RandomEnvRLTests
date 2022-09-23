@@ -2,8 +2,8 @@ import numpy as np
 import torch as t
 from torch.distributions import MultivariateNormal
 
-from random_env.envs import RandomEnv, RunningStats
-from my_agents_utils import timeit
+from random_env.envs import RandomEnv
+from deep_rl.my_agents_utils import timeit
 
 # env = RandomEnv.load_from_dir('common_envs')
 env = RandomEnv(5, 5, True)

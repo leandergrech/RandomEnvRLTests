@@ -11,7 +11,7 @@ from my_agents_utils import EvalCheckpointEarlyStopTrainingCallback, make_path_e
 
 COMET_WORKSPACE = 'testing-ppo-trpo'
 
-COMMON_ENV_DIR = 'common_envs'
+COMMON_ENV_DIR = '../common_envs'
 DEFAULT_PPO_PARAMS = dict(
     # Network structures
     actor_hidden_layers=[200, 200],
