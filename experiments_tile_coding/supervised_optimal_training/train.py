@@ -8,7 +8,7 @@ import yaml
 from tqdm import trange
 
 from random_env.envs.random_env_discrete_actions import REDAClip, RandomEnv, get_discrete_actions
-from experiments_tile_coding.eval_utils import play_episode, get_val
+from experiments_tile_coding.eval_utils import play_episode, get_val, eval_agent
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
 from tile_coding_re.heatmap_utils import make_heatmap
 
@@ -34,7 +34,8 @@ os.makedirs(exp_dir)
 params = dict(
     n_obs=2, n_act=2,
     nb_tilings=16, nb_bins=2,
-    nb_eps=500, lr=0.01, gamma=0.9
+    nb_eps=500, lr=0.01, gamma=0.9,
+    eval_every=100, eval_eps=20
 )
 with open(os.path.join(exp_dir, "train_params.yml"), "w") as f:
     f.write(yaml.dump(params))
@@ -42,7 +43,9 @@ with open(os.path.join(exp_dir, "train_params.yml"), "w") as f:
 # Create environment and action space
 n_obs = params['n_obs']
 n_act = params['n_act']
-env = REDAClip(params['n_obs'], n_act, state_clip=1.0)
+env = REDAClip(n_obs, n_act, state_clip=1.0)
+eval_env = REDAClip(n_obs, n_act, state_clip=1.0, model_info=env.model_info)
+
 env_lims = [[l,h] for l,h in zip(env.observation_space.low, env.observation_space.high)]
 actions = get_discrete_actions(n_act, 3)
 nb_actions = len(actions)
@@ -59,16 +62,28 @@ q = QValueFunctionTiles3(tilings=tilings, n_discrete_actions=nb_actions)
 nb_eps = params['nb_eps']
 lr = params['lr']
 gamma = params['gamma']
+eval_every = params['eval_every']
 
 gammas = np.power(gamma, np.arange(env.EPISODE_LENGTH_LIMIT))
+T = 0
+all_ep_lens = []
+all_returns = []
+iht_counts = []
 for ep in trange(nb_eps):
     obses, acts, rews = play_episode(env, optimal_agent, init_state=None)
     returns = []
 
     ep_len = len(rews)
+    # Monte Carlo update with expert trajectories
     for i, (obs, act, rew) in enumerate(zip(obses[:-1], acts, rews)):
         g = np.sum(np.multiply(gammas[:ep_len - i], rews[i:]))
         q.update(obs, act, g, lr)
+        T += 1
+        if (T + 1) % eval_every == 0:
+            _, returns, ep_lens = eval_agent(eval_env, q, params.get('eval_eps'))
+            all_ep_lens.append(ep_lens)
+            all_returns.append(returns)
+            iht_counts.append(tilings.count())
 
 # Initialise grid tracking states
 n_tracking_dim = 64

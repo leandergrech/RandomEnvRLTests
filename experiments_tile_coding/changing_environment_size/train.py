@@ -5,6 +5,7 @@ import yaml
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pickle as pkl
+from multiprocessing import Pool
 
 from training_utils import ExponentialDecay, Constant, get_training_utils_yaml_dumper, LinearDecay, StepDecay, circular_initial_state_distribution_2d
 from experiments_tile_coding.sarsa import train_instance; algo_name = 'sarsa'
@@ -36,7 +37,7 @@ class InitFunc:
 
 
 def run_experiment(exp_name):
-    n_obses = [2, 3, 4, 5]
+    n_obses = [2]#, 3, 4, 5]
     n_act = 2
     nb_actions = len(get_discrete_actions(n_act, 3))
 
@@ -84,7 +85,7 @@ def run_experiment(exp_name):
             results_path=experiment_dir,
             lr_fun=lr_fun,
             exp_fun=exp_fun,
-            nb_training_steps=1000000,
+            nb_training_steps=100000,
             eval_every=2000,
             eval_eps=20,
             save_every=2000,
@@ -104,9 +105,9 @@ def run_experiment(exp_name):
             d = dict(ep_lens=ep_lens, iht_counts=iht_counts, returns=returns)
             pkl.dump(d, f)
 
-from multiprocessing import Pool
+
 if __name__ == '__main__':
-    nb_trials = 4
+    nb_trials = 1
     with Pool(8) as p:
         exp_prefix = dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S')
         p.map(run_experiment, [f'{exp_prefix}_{item}' for item in range(nb_trials)])

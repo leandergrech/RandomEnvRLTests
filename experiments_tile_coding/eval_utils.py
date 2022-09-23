@@ -72,6 +72,18 @@ def make_state_violins(init_obses, terminal_obses, path):
     plt.close(fig)
 
 
+def get_latest_experiment(lab_dir):
+    experiments = []
+    for fn in os.listdir(lab_dir):
+        if 'sarsa' in fn:
+            experiments.append(fn)
+    experiments = sorted(experiments)
+
+    experiment_name = experiments[-1]
+
+    return os.path.join(lab_dir, experiment_name)
+
+
 def get_optimal_ep_len(env):
     nb_eps = 200
     ep_lens = []
