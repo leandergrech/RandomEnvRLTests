@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from collections import defaultdict
 from tqdm import trange
-from random_env.envs import RandomEnvDiscreteActions as REDA, VREDA, get_discrete_actions
-
+from random_env.envs import RandomEnvDiscreteActions as REDA, VREDA, get_discrete_actions, REDAClip
+import yaml
 
 def quick_testing_randomenvdiscreteactions():
     n_obs = 5
@@ -251,10 +251,26 @@ def testing_reda_optimal_policy():
     plt.show()
 
 
+def testing_redaclip_yaml():
+    from random_env.envs import RunningStats
+    env = REDAClip(2, 2, 1.0)
+    test_file = 'save.yml'
+    print('Before save:')
+    print(env.rm, env.pi, env.trim_stats)
+    with open(test_file, 'w') as f:
+        yaml.dump({'env': env}, f, default_flow_style=False)
+
+    with open(test_file, 'r') as f:
+        d = yaml.load(f, Loader=yaml.Loader)
+        loaded_env = d['env']
+    print('After save')
+    print(loaded_env.rm, loaded_env.pi, loaded_env.trim_stats)
+
 
 if __name__ == '__main__':
     # testing_vreda_velocities()
     # testing_vreda_eplens()
     # vreda_diagnostic_plots()
     # testing_reda_trims()
-    testing_reda_optimal_policy()
+    # testing_reda_optimal_policy()
+    testing_redaclip_yaml()

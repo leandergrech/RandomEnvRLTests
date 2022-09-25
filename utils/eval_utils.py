@@ -72,10 +72,10 @@ def make_state_violins(init_obses, terminal_obses, path):
     plt.close(fig)
 
 
-def get_latest_experiment(lab_dir):
+def get_latest_experiment(lab_dir, pattern='sarsa'):
     experiments = []
     for fn in os.listdir(lab_dir):
-        if 'sarsa' in fn:
+        if pattern in fn:
             experiments.append(fn)
     experiments = sorted(experiments)
 
@@ -84,8 +84,11 @@ def get_latest_experiment(lab_dir):
     return os.path.join(lab_dir, experiment_name)
 
 
-def get_optimal_ep_len(env):
-    nb_eps = 200
+def get_optimal_ep_len(env, nb_eps=200):
+    """
+    Run optimal policy provided by env.get_optimal_policy for nb_eps episodes
+    and return average episode length.
+    """
     ep_lens = []
     for _ in range(nb_eps):
         o = env.reset()
@@ -100,10 +103,19 @@ def get_optimal_ep_len(env):
     return np.mean(ep_lens)
 
 
-get_q_func_step = lambda item: int(os.path.split(item)[-1].split('_')[2].split('.')[0])
+def get_q_func_step(fn):
+    """
+        Every experiment contains q_func directory which stores the QValueFunctionTiles3
+        instance at a specified training step. Training step X obtained from filename fn
+        in the form q_step_X.pkl.
+    """
+    return int(os.path.split(fn)[-1].split('_')[2].split('.')[0])
 
 
 def get_q_func_filenames(experiment_dir):
+    """
+        Every experiment has q_func directory. Get sorted filenames found within.
+    """
     q_func_dir = os.path.join(experiment_dir, 'q_func')
     q_func_filenames = [fn for fn in os.listdir(q_func_dir)]
 
@@ -114,10 +126,19 @@ def get_q_func_filenames(experiment_dir):
 
 
 def get_q_func_xrange(q_func_filenames):
+    """
+        Given a sorted list of q-table files stored during an experiment, return
+        the xrange to be used for the plotting x-axis.
+    """
     return np.linspace(get_q_func_step(q_func_filenames[0]), get_q_func_step(q_func_filenames[-1]), len(q_func_filenames))
 
 
 def get_val(qvf, state, nb_actions):
+    """
+        Value is defined as the expected return given a state. QValueFunctionTiles3
+        only gives us Q-values. I'm assuming the value is the average of all q-values
+        obtained from all possible actions.
+    """
     return np.mean([qvf.value(state, a_) for a_ in range(nb_actions)])
 
 

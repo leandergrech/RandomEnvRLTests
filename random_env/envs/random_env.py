@@ -8,6 +8,7 @@ from gym import Env
 from gym.spaces import Box
 from scipy import stats
 import pickle as pkl
+import yaml
 
 
 class RandomEnv(Env):
@@ -342,9 +343,10 @@ def quick_testing_randomenv():
 
 
 # 03/02/2022
-import yaml
 class RunningStats(yaml.YAMLObject):
-    def __init__(self, size, axis=0):
+    yaml_tag = '!RunningStats'
+
+    def __init__(self, size):
         self.M = np.zeros(size)
         self.S = np.zeros(size)
         self.Min = np.repeat(np.inf, size)
@@ -353,13 +355,25 @@ class RunningStats(yaml.YAMLObject):
 
     @classmethod
     def to_yaml(cls, dumper, data):
-        return dumper.represent_mapping('!RunningStats', {
+        return dumper.represent_mapping(cls.yaml_tag, {
             'Mean': data.M.tolist(),
             'Std': data.S.tolist(),
             'Min': data.Min.tolist(),
             'Max': data.Max.tolist(),
             'nb_calls': data.n
         })
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        d = loader.construct_mapping(node)
+        size = len(d['Mean'])
+        rs = RunningStats(size=size)
+        rs.M = np.array(d['Mean'])
+        rs.S = np.array(d['Std'])
+        rs.Min = np.array(d['Min'])
+        rs.Max = np.array(d['Max'])
+        rs.n = d['nb_calls']
+        return rs
 
     def __repr__(self):
         return f"Mean: min={min(self.mean):.2f} max={max(self.mean):.2f}\n" \
@@ -408,7 +422,9 @@ class RunningStats(yaml.YAMLObject):
         else:
             return self.Max - self.Min
 
-yaml.SafeDumper.add_representer(RunningStats, RunningStats.to_yaml)
+
+yaml.add_representer(RunningStats, RunningStats.to_yaml)
+yaml.add_constructor(RunningStats.yaml_tag, RunningStats.from_yaml)
 
 
 def dynamic_scale_adjustment_test():

@@ -8,7 +8,7 @@ warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 
 from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
-from experiments_tile_coding.eval_utils import eval_agent, make_state_violins
+from utils.eval_utils import eval_agent, make_state_violins
 from utils.training_utils import *#ExponentialDecay, get_training_utils_yaml_dumper
 
 from tqdm import trange

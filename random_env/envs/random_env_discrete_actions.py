@@ -24,7 +24,7 @@ class RandomEnvDiscreteActions(RandomEnv, yaml.YAMLObject):
         RandomEnv.step(.)
     The action is reset to zero vector at the start of every episode
     """
-    ACTION_EPS = 0.1
+    ACTION_EPS = 0.05
     AVAIL_MOM = [-ACTION_EPS, 0., ACTION_EPS]
     yaml_tag = "!REDA"
 
@@ -104,6 +104,15 @@ class RandomEnvDiscreteActions(RandomEnv, yaml.YAMLObject):
             'trim_stats': env_instance.trim_stats
         })
 
+    @classmethod
+    def from_yaml(cls, loader, node):
+        d = loader.construct_mapping(node)
+        env = cls(d['n_obs'], d['n_act'], estimate_scaling=False)
+        env.rm = np.array(d['rm'])
+        env.pi = np.array(d['pi'])
+        env.trim_stats = d['trim_stats']
+        return env
+
 
 class REDAClip(RandomEnvDiscreteActions):
     yaml_tag = '!REDAClip'
@@ -151,9 +160,20 @@ class REDAClip(RandomEnvDiscreteActions):
             'trim_stats': env_instance.trim_stats
         })
 
+    @classmethod
+    def from_yaml(cls, loader, node):
+        d = loader.construct_mapping(node)
+        env = cls(d['n_obs'], d['n_act'], estimate_scaling=False)
+        env.state_clip = d['state_clip']
+        env.rm = np.array(d['rm'])
+        env.pi = np.array(d['pi'])
+        env.trim_stats = d['trim_stats']
+        return env
 
-yaml.SafeDumper.add_representer(RandomEnvDiscreteActions, RandomEnvDiscreteActions.to_yaml)
-yaml.SafeDumper.add_representer(REDAClip, REDAClip.to_yaml)
+
+# for env_type in (RandomEnvDiscreteActions, REDAClip):
+#     yaml.add_representer(env_type, env_type.to_yaml)
+#     yaml.add_constructor(env_type.yaml_tag, env_type.from_yaml)
 
 
 class REDAX(RandomEnvDiscreteActions):
@@ -210,3 +230,4 @@ class VREDA(RandomEnvDiscreteActions):
         else:
             working_state = state[:self.obs_dimension]
         return super(VREDA, self).get_optimal_action(working_state, state_clip)
+

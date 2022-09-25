@@ -12,9 +12,9 @@ import re
 from tile_coding_re.tiles3_qfunction import QValueFunctionTiles3
 from random_env.envs.random_env_discrete_actions import RandomEnvDiscreteActions as REDA, get_discrete_actions
 from utils.heatmap_utils import make_heatmap
-from experiments_tile_coding.eval_utils import play_episode
+from utils.eval_utils import play_episode
 
-from eval_utils import get_q_func_filenames, get_q_func_xrange, get_val, get_q_func_step
+from utils.eval_utils import get_q_func_filenames, get_q_func_xrange, get_val, get_q_func_step
 
 
 def unpack_stats(arr, key, rolling):
@@ -26,13 +26,19 @@ def get_eval_every_hack(yaml_path):
     with open(yaml_path, 'r') as f:
         for line in f:
             if 'eval_every' in line:
-                return re.findall(r'\d+', line)
+                return int(re.findall(r'\d+', line)[0])
 
 
 SUB_EXP_COLORS = ['r', 'g', 'b', 'k'] # I never exceed 4 sub-experiments
 
 
 def plot_experiment_training_stats(exp_pardir, exp_subdirs, exp_labels):
+    """
+    Access training_stats.pkl for a single experiment and plot training stats.
+    Top plot:    IHT count evolution
+    Middle plot: Episode length mean+std obtained using latest q-table greedily
+    Bottom plot: Return mean obtained using latest q-table greedily
+    """
     stats_files = [os.path.join(exp_pardir, subdir, 'training_stats.pkl') for subdir in exp_subdirs]
 
     eval_every = get_eval_every_hack(os.path.join(exp_pardir, exp_subdirs[0], 'train_params.yml'))
@@ -41,8 +47,9 @@ def plot_experiment_training_stats(exp_pardir, exp_subdirs, exp_labels):
     for label, pkl_fn, c in zip(exp_labels, stats_files, SUB_EXP_COLORS):
         with open(pkl_fn, 'rb') as f:
             data = pkl.load(f)
-            el_stats = data['eval_el_stats']
             iht_counts = data['iht_counts']
+            el_stats = data['ep_lens']
+            returns = data['returns']
 
             xrange = np.arange(len(iht_counts)) * eval_every
 
@@ -52,7 +59,6 @@ def plot_experiment_training_stats(exp_pardir, exp_subdirs, exp_labels):
             ax.set_ylabel('Nb tiles discovered')
 
             ax = axs[1]
-
             ax.plot(xrange, unpack_stats(el_stats, 'mean', 1), ls='dashed', c=c, label=f'{label} Mean')
             ax.plot(xrange, unpack_stats(el_stats, 'median', 1), ls='solid', c=c, label=f'{label} Median')
             ax.plot(xrange, unpack_stats(el_stats, 'min', 1), ls='dotted', c=c, label=f'{label} Min')
@@ -68,6 +74,13 @@ def plot_experiment_training_stats(exp_pardir, exp_subdirs, exp_labels):
 
 
 def plot_all_experiments_training_stats(exp_pardir, exp_subdirs, exp_labels, exp_filter=''):
+    """
+        Access training_stats.pkl for all experiments found in exp_pardir and
+        plot their combined training stats.
+        Top plot:    IHT count evolution
+        Middle plot: Episode length mean+std obtained using latest q-table greedily
+        Bottom plot: Return mean obtained using latest q-table greedily
+    """
     returns = defaultdict(list)
     ep_lens = defaultdict(list)
     iht_counts = defaultdict(list)
@@ -147,9 +160,22 @@ def plot_all_experiments_training_stats(exp_pardir, exp_subdirs, exp_labels, exp
     for ax in axs:
         ax.legend(loc='best', prop=dict(size=10))
         ax.set_xlabel('Training steps')
-    fig.suptitle(f'Changing type of policy over\n{len(all_exp)} different environments')
+    fig.suptitle(f'{len(all_exp)} different environments')
     fig.tight_layout()
     plt.savefig(os.path.join(exp_pardir, 'results.png'))
+
+
+def create_grid_tracking_states(env, n_dim):
+    """
+    Utility function to create grid of states for passed env. Each env state
+    dimension is split into n_dim parts. Returns 1D list with n_dim**n_obs
+    total states.
+    """
+    tracking_ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
+    tracking_states = np.array(
+        [list(item) for item in product(*np.array([np.linspace(l, h, n_dim) for l, h in tracking_ranges]))])
+
+    return tracking_states
 
 
 def plot_q_vals_grid_tracking_states(experiment_dir, n_tracking_dim=5, env_type=REDA, save_dir=None):
@@ -171,9 +197,7 @@ def plot_q_vals_grid_tracking_states(experiment_dir, n_tracking_dim=5, env_type=
     xrange = get_q_func_xrange(q_func_filenames)
 
     # Initialise grid tracking states
-    tracking_ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
-    tracking_states = np.array(
-        [list(item) for item in product(*np.array([np.linspace(l, h, n_tracking_dim) for l, h in tracking_ranges]))])
+    tracking_states = create_grid_tracking_states(env, n_tracking_dim)
     nb_tracked = len(tracking_states)
 
     vals = np.zeros(shape=(nb_tracked, nb_q_funcs))
@@ -399,101 +423,52 @@ def plot_individual_action_advantage(experiment_dir, query_step, env_type=REDA, 
     plt.savefig(save_path)
 
 
-#
-# def plot_compare_qvals_during_training():
-#     experiment_dir = 'changing_policy_type/sarsa_091322_005443_0/eps-greedy'
-#     experiment_name = os.path.split(experiment_dir)
-#
-#     # env = REDA.load_from_dir(experiment_dir)
-#     env = REDAClip(2, 2, state_clip=0.0)
-#     env.load_dynamics(os.path.join(experiment_dir, 'REDAClip_0.0clip_2obsx2act_dynamics.pkl'))
-#     env.state_clip = 0.0
-#
-#     actions = get_discrete_actions(env.act_dimension, 3)
-#     nb_actions = len(actions)
-#
-#     print('Searching for training data')
-#     q_func_filenames = get_q_func_filenames(experiment_dir)
-#     training_steps = [get_q_func_step(qfn) for qfn in q_func_filenames]
-#     # qs = [QValueFunctionTiles3.load(item) for item in q_func_filenames]
-#     nb_q_funcs = len(q_func_filenames)
-#
-#     # query_training_step_start = 79500 - 1
-#     # query_training_step_finish = 80000- 1
-#     query_training_step_start = 80000 - 1
-#     query_training_step_finish = 80500 - 1
-#
-#     qs = []
-#     actual_steps = []
-#     for step in (query_training_step_start, query_training_step_finish):
-#         qfn_at_step = q_func_filenames[np.searchsorted(training_steps, step)]
-#         at_training_step = get_q_func_step(qfn_at_step)
-#         actual_steps.append(at_training_step)
-#         q = QValueFunctionTiles3.load(qfn_at_step)
-#         qs.append(q)
-#
-#     # Initialise grid tracking states
-#     n_tracking_dim = 64
-#     tracking_lim = 1.2
-#     tracking_ranges = [[-tracking_lim, -tracking_lim], [tracking_lim, tracking_lim]]
-#     tracking_ranges = [[l, h] for l, h in zip(*tracking_ranges)]
-#     tracking_states = np.array(
-#         [list(item) for item in product(*np.array([np.linspace(l, h, n_tracking_dim) for l, h in tracking_ranges]))])
-#     nb_tracked = len(tracking_states)
-#
-#     tracked_qvals = []
-#     for q in qs:
-#         tracked_qvals.append([])
-#         for action_idx in range(nb_actions):
-#             tracked_qvals[-1].append([])
-#             temp = []
-#             for ts in tracking_states:
-#                 # ax.scatter(ts[0], ts[1], marker='o', c='k')
-#                 qval = q.value(ts, action_idx)
-#                 temp.append(qval)
-#             temp = np.array(temp).reshape((n_tracking_dim, n_tracking_dim))
-#             tracked_qvals[-1][-1].append(np.flipud(np.rot90(temp)))
-#     tracked_qvals = -np.squeeze(np.subtract(*tracked_qvals))
-#
-#
-#
-#     fig, axs = plt.subplots(3, 3, figsize=(15, 10))
-#     axs = np.ravel(axs)
-#     for action_idx, (ax, act, qvals) in enumerate(zip(axs, actions, tracked_qvals)):
-#         init_state = np.array([0.0, 0.0])
-#         env.reset(init_state.copy())
-#         otp1, *_ = env.step(act)
-#         ax.plot(*np.vstack([init_state, otp1]).T, c='k', marker='x', zorder=20)
-#
-#
-#         make_heatmap(ax, qvals, tracking_states.T[0], tracking_states.T[1], title=f'{act}')
-#         ax.add_patch(mpl.patches.Circle((0, 0), env.GOAL, edgecolor='g', ls='--', facecolor='None', zorder=20))
-#
-#     fig.suptitle(f'{repr(env)}\n'
-#                  f'Training step = {actual_steps}')
-#     # fig.tight_layout()
-#     plt.subplots_adjust(left=0.1, bottom=0.05, right=0.9, top=0.88, wspace=0.083, hspace=0.321)
-#     plt.savefig(os.path.join(experiment_dir, f'change_action_qvals_from-step-{actual_steps[0]}-to-step-{actual_steps[1]}.png'))
-#
-#     # fig, ax = plt.subplots()
-#     # qvals = []
-#     # for ts in tracking_states:
-#     #     qvals.append(np.max([q.value(ts, a_) for a_ in range(nb_actions)]))
-#     # qvals = np.array(qvals).reshape((n_tracking_dim, n_tracking_dim))
-#     # qvals = np.flipud(np.rot90(qvals))
-#     # make_heatmap(ax, qvals, tracking_states.T[0], tracking_states.T[1], title='Estimated values')
-#     # ax.add_patch(mpl.patches.Circle((0, 0), env.GOAL, edgecolor='g', ls='--', facecolor='None', zorder=20))
-#     # plt.savefig(os.path.join(experiment_dir, f'vals_at-step-{at_training_step}.png'))
+def plot_trims_during_training(experiment_dir, env_type, save_dir=None):
+    if save_dir is None:
+        save_dir = experiment_dir
 
-if __name__ == '__main__':
-    # plot_q_vals_grid_tracking_states()
-    # plot_q_vals_region_sampling_tracking_states()
+    save_dir = os.path.join(save_dir, 'log_trims')
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
-    # sub_exps = ['eps-greedy', 'boltz-1', 'boltz-5', 'boltz-10']
-    exp_dir = 'changing_environment_size/exp1/sarsa_091422_214300_0/REDAClip_1.0clip_5obsx2act'
-    # at_step = 80000
-    # for sub_exp in sub_exps:
-    #     exp_path = os.path.join(exp_dir, sub_exp)
-    # plot_individual_action_advs(exp_path, at_step)
-    plot_q_vals_region_sampling_tracking_states(exp_dir)
-    # plot_compare_qvals_during_training()
+    env = env_type.load_from_dir(experiment_dir)
+    n_obs = env.obs_dimension
+    n_act = env.act_dimension
+    actions = get_discrete_actions(n_act, 3)
+    nb_actions = len(actions)
+
+    # Searching for training data
+    q_func_filenames = get_q_func_filenames(experiment_dir)
+
+    # Create tracking states
+    tracking_states = create_grid_tracking_states(env, 10)
+    nb_tracked = len(tracking_states)
+
+    # Initialise array holding trim coordinates
+    tracked_trims = np.array([[ts, np.zeros_like(ts)] for ts in tracking_states])
+
+    def update_trims(qvf: QValueFunctionTiles3):
+        for idx, ts in enumerate(tracking_states):
+            action_idx = qvf.greedy_action(ts)
+            a = actions[action_idx]
+            env.reset(ts.copy())
+            tstp1, *_ = env.step(a)
+            tracked_trims[idx, 1] = tstp1
+
+    for i, qfn in enumerate(q_func_filenames):
+        q = QValueFunctionTiles3.load(qfn)
+        update_trims(q)
+        fig, ax = plt.subplots()
+        for tt in tracked_trims:
+            X, Y = tt.T
+            dx, dy = np.array(tt[1] - tt[0]).T
+            ax.arrow(X[0], Y[0], dx, dy, color='k', width=0.01, lw=.8, zorder=5)
+        ax.add_patch(mpl.patches.Circle((0,0), env.GOAL, edgecolor='g', facecolor='None', ls='--'))
+        q_step = get_q_func_step(qfn)
+        fig.suptitle(f'Training step={q_step}')
+        save_path = os.path.join(save_dir, f'{q_step}.png')
+        plt.savefig(save_path)
+        plt.close(fig)
+        print(save_path)
+
+

@@ -12,8 +12,8 @@ def init_label(label):
 class CustomFunc(yaml.YAMLObject):
     yaml_tag = '!CustomFunc'
 
-    def __init__(self):
-        self.pow = 0.75
+    def __init__(self, pow=0.75):
+        self.pow = pow
 
     def __call__(self, ep_idx):
         return 1/((ep_idx + 1) ** self.pow)
@@ -24,8 +24,14 @@ class CustomFunc(yaml.YAMLObject):
     @classmethod
     def to_yaml(cls, dumper, data):
         return dumper.represent_mapping(cls.yaml_tag, {
-        "func": repr(data)
+            'func': repr(data),
+            'pow': data.pow
         })
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        d = loader.construct_mapping(node)
+        return CustomFunc(pow=d['pow'])
 
 
 class Constant(yaml.YAMLObject):
@@ -44,8 +50,14 @@ class Constant(yaml.YAMLObject):
     @classmethod
     def to_yaml(cls, dumper, data):
         return dumper.represent_mapping(cls.yaml_tag, {
-            "val": data.val
+            'val': data.val,
+            'label': data.label
         })
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        d = loader.construct_mapping(node)
+        return Constant(val=d['val'], label=d['label'])
 
 
 class ExponentialDecay(yaml.YAMLObject):
@@ -65,10 +77,16 @@ class ExponentialDecay(yaml.YAMLObject):
     @classmethod
     def to_yaml(cls, dumper, data):
         return dumper.represent_mapping(cls.yaml_tag, {
-            "init": data.init,
-            "halflife": data.halflife,
-            "label": data.label
+            'init': data.init,
+            'halflife': data.halflife,
+            'label': data.label
         })
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        d = loader.construct_mapping(node)
+        return ExponentialDecay(init=d['init'], halflife=d['halflife'],
+                                label=d['label'])
 
 
 class LinearDecay(yaml.YAMLObject):
@@ -89,11 +107,17 @@ class LinearDecay(yaml.YAMLObject):
     @classmethod
     def to_yaml(cls, dumper, data):
         return dumper.represent_mapping(cls.yaml_tag, {
-            "init": data.init,
-            "final": data.final,
-            "decay_steps": data.decay_steps,
-            "label": data.label
+            'init': data.init,
+            'final': data.final,
+            'decay_steps': data.decay_steps,
+            'label': data.label
         })
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        d = loader.construct_mapping(node)
+        return LinearDecay(init=d['init'], final=d['final'],
+                           decay_steps=d['decay_steps'], label=d['label'])
 
 
 class StepDecay(yaml.YAMLObject):
@@ -114,18 +138,22 @@ class StepDecay(yaml.YAMLObject):
     @classmethod
     def to_yaml(cls, dumper, data):
         return dumper.represent_mapping(cls.yaml_tag, {
-            "init": data.init,
-            "decay_rate": data.decay_rate,
-            "decay_every": data.decay_every,
-            "label": data.label
+            'init': data.init,
+            'decay_rate': data.decay_rate,
+            'decay_every': data.decay_every,
+            'label': data.label
         })
 
+    @classmethod
+    def from_yaml(cls, loader, node):
+        d = loader.construct_mapping(node)
+        return StepDecay(init=d['init'], decay_rate=d['decay_rate'],
+                         decay_every=d['decay_every'], label=d['label'])
 
-yaml.SafeDumper.add_representer(CustomFunc, CustomFunc.to_yaml)
-yaml.SafeDumper.add_representer(Constant, Constant.to_yaml)
-yaml.SafeDumper.add_representer(ExponentialDecay, ExponentialDecay.to_yaml)
-yaml.SafeDumper.add_representer(LinearDecay, LinearDecay.to_yaml)
-yaml.SafeDumper.add_representer(StepDecay, StepDecay.to_yaml)
+
+for cls in (CustomFunc, Constant, ExponentialDecay, LinearDecay, StepDecay):
+    yaml.add_representer(cls, cls.to_yaml)
+    yaml.add_constructor(cls.yaml_tag, cls.from_yaml)
 
 
 def circular_initial_state_distribution_2d():
