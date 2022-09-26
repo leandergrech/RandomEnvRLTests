@@ -52,21 +52,18 @@ class RandomEnvDiscreteActions(RandomEnv, yaml.YAMLObject):
         """
         :param action: Array of size self.act_dimension. Each action can be one of (0,1,2) - to index self.AVAIL_MOM
         """
-        # for i, a in enumerate(action):
-        #     assert a in (0, 1, 2), f"Invalid action at index {i}: {a}"
-
         # Convert from [0, 1, 2] --> [-1, 0, 1]
         centered_action = np.array(action) - 1
-        '''
-        increment self.cum_action
-        '''
+        # '''
+        # increment self.cum_action
+        # '''
         # delta_action = centered_action * self.ACTION_EPS
         # self.cum_action += delta_action
         # return super(RandomEnvDiscreteActions, self).step(self.cum_action)
 
-        '''
-        self-centering mechanism
-        '''
+        # '''
+        # self-centering mechanism
+        # '''
         # temp = np.clip(self.action_counter, -1, 1)
         # correct_action = centered_action + np.multiply(temp, np.abs(centered_action) - 1)
         # self.action_counter += correct_action

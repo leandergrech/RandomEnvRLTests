@@ -425,9 +425,8 @@ def plot_individual_action_advantage(experiment_dir, query_step, env_type=REDA, 
 
 def plot_trims_during_training(experiment_dir, env_type, save_dir=None):
     if save_dir is None:
-        save_dir = experiment_dir
+        save_dir = os.path.join(experiment_dir, 'log_trims')
 
-    save_dir = os.path.join(save_dir, 'log_trims')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -441,7 +440,7 @@ def plot_trims_during_training(experiment_dir, env_type, save_dir=None):
     q_func_filenames = get_q_func_filenames(experiment_dir)
 
     # Create tracking states
-    tracking_states = create_grid_tracking_states(env, 10)
+    tracking_states = create_grid_tracking_states(env, 15)
     nb_tracked = len(tracking_states)
 
     # Initialise array holding trim coordinates

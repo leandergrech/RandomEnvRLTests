@@ -74,11 +74,14 @@ def train_instance(**kwargs):
     a = q.greedy_action(o)
 
     for T in trange(nb_training_steps):
-        otp1, _, d, _ = env.step(actions[a])
+        otp1, _, d, info = env.step(actions[a])
         r = objective_func(otp1)
+        if info['success']:
+            r = 0
 
         exploration = exp_fun(T)
         a_ = policy(otp1, q, exploration)
+
 
         target = r + gamma * q.value(otp1, a_)
 

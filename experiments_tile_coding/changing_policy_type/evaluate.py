@@ -15,11 +15,12 @@ if __name__ == '__main__':
         'boltz-5',
         'boltz-1'
     ]
-    # plot_all_experiments_training_stats('1.0-clip', exp_subdirs, exp_labels)
+    plot_all_experiments_training_stats('1.0-clip_smaller-action_0.0-goal-reward', exp_subdirs, exp_labels)
 
-    exp_pardir = 'no-clip/sarsa_092522_202747_0'
-    # plot_experiment_training_stats(exp_pardir=exp_pardir, exp_subdirs=exp_subdirs, exp_labels=exp_labels)
+    # exp_pardir = '1.0-clip_smaller-action_0.0-goal-reward/sarsa_092622_125818_0'
+    # sub_exp = 'boltz-1'
+    # plot_experiment_training_stats(exp_pardir, exp_subdirs, exp_labels)
 
-
-    exp_dir = os.path.join(exp_pardir, 'boltz-1')
-    plot_trims_during_training(exp_dir, REDAClip)
+    # exp_dir = os.path.join(exp_pardir, sub_exp)
+    # exp_dir = os.path.join(exp_pardir, 'eps-greedy')
+    # plot_trims_during_training(exp_dir, REDAClip)#, save_dir=os.path.join('log_trims', sub_exp))

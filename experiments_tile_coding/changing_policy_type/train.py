@@ -83,7 +83,7 @@ def run_experiment(exp_name):
 
 
 if __name__ == '__main__':
-    nb_trials = 8
+    nb_trials = 4
     with Pool(4) as p:
         exp_prefix = dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S')
         p.map(run_experiment, [f'{exp_prefix}_{item}' for item in range(nb_trials)])
