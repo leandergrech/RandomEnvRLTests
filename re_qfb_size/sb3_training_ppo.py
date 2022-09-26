@@ -3,7 +3,7 @@ import numpy as np
 import yaml
 from datetime import datetime as dt
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.ppo.policies import MlpPolicy as PPOPolicy
 
 from random_env.envs import RandomEnv
@@ -92,26 +92,26 @@ class EvaluationAndCheckpointCallback(BaseCallback):
 
         return True
 
-
-class RESolvableInit(RandomEnv):
-    def __init__(self, *args, **kwargs):
-        super(RESolvableInit, self).__init__(*args, **kwargs)
-        self.init_func = InitSolvableState(self, 0.9)
-
-    def reset(self, init_state=None):
-        if init_state is None:
-            init_state = self.init_func()
-        super(RESolvableInit, self).reset(init_state)
-        return init_state
+# Use when n_obs > n_act
+# class RESolvableInit(RandomEnv):
+#     def __init__(self, *args, **kwargs):
+#         super(RESolvableInit, self).__init__(*args, **kwargs)
+#         self.init_func = InitSolvableState(self, 0.9)
+#
+#     def reset(self, init_state=None):
+#         if init_state is None:
+#             init_state = self.init_func()
+#         super(RESolvableInit, self).reset(init_state)
+#         return init_state
 
 
 experiment_name = f"PPO_{dt.strftime(dt.now(), '%m%d%y_%H%M%S')}"
 if not os.path.exists(experiment_name):
     os.makedirs(experiment_name)
 
-env = RESolvableInit(16, 2, False)
+env = RandomEnv(n_obs=2, n_act=16, estimate_scaling=False)
 env.save_dynamics(experiment_name)
-eval_env = RESolvableInit(16, 2, False, model_info=env.model_info)
+eval_env = RandomEnv(env.obs_dimension, env.act_dimension, False, model_info=env.model_info)
 
 nb_steps = int(1e5)
 
@@ -145,8 +145,9 @@ for random_seed in (123, 234, 345, 456, 567):
     model = PPO(PPOPolicy, env, **ppo_params)
     # eval_callback = EvaluationAndCheckpointCallback(eval_env, save_dir=save_dir,
     #                                                 EVAL_FREQ=100, CHKPT_FREQ=1000)
-    callbacks = None #eval_callback
-    with open(os.path.join(save_dir, 'training_params.yml'), 'w') as f:
+    chkpt_callback = CheckpointCallback(save_freq=1000, save_path=save_dir)
+    callbacks = chkpt_callback
+    with open(os.path.join(model_dir, 'training_params.yml'), 'w') as f:
         yaml.dump(ppo_params, f)
 
     model.learn(total_timesteps=nb_steps, log_interval=10, reset_num_timesteps=True,
