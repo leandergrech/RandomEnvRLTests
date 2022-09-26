@@ -182,7 +182,7 @@ class RandomEnv(Env):
             first_pad, second_pad = 0, 0
 
         # Pad s to match sizes of actions and states
-        s = np.pad(s, ((0, first_pad), (0, second_pad)))
+        s = np.pad(s, ((0, first_pad), (0, second_pad)), mode='constant', constant_values=0.0)
 
         # Get inverse components
         with warnings.catch_warnings():

@@ -1,4 +1,5 @@
 import os
+from copy import deepcopy
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -25,22 +26,34 @@ def play_episode(eval_env, q, init_state=None):
     return obses, acts, rews
 
 
-def eval_agent(eval_env, q, nb_eps):
+def eval_agent(eval_env, q, nb_eps, init_func=None):
+    if init_func is None:
+        init_func = eval_env.reset
+
+    opt_env = deepcopy(eval_env)
+
     init_obses = np.empty(shape=(0, eval_env.obs_dimension))
     terminal_obses = np.empty(shape=(0, eval_env.obs_dimension))
+    regrets = []
     ep_lens = []
-    returns= []
+    returns = []
 
     actions = get_discrete_actions(eval_env.act_dimension, 3)
     for _ in range(nb_eps):
-        o = eval_env.reset()
+        o = eval_env.reset(init_func())
         d = False
-        init_obses = np.vstack([init_obses, o])
+        init_obses = np.vstack([init_obses, o. copy()])
         t = 0
         g = 0
+        regret = 0
         while not d:
             a = q.greedy_action(o)
             otp1, r, d, _ = eval_env.step(actions[a])
+
+            opt_env.reset(o.copy())
+            _, ropt, *_ = opt_env.step(opt_env.get_optimal_action(o))
+
+            regret += ropt - r
 
             g += r
             o = otp1
@@ -48,15 +61,16 @@ def eval_agent(eval_env, q, nb_eps):
         terminal_obses = np.vstack([terminal_obses, o])
         ep_lens.append(t)
         returns.append(g)
+        regrets.append(regret)
 
-    obses = dict(initial_observations=init_obses, terminal_observations=terminal_obses)
-    # ep_len_stats = dict(mean=np.mean(ep_lens), median=np.median(ep_lens), min=min(ep_lens), max=max(ep_lens))
-    return obses, returns, ep_lens
+    obses = dict(initial=init_obses, terminal=terminal_obses)
+
+    return dict(obses=obses, returns=returns, ep_lens=ep_lens, regrets=regrets)
 
 
 def make_state_violins(init_obses, terminal_obses, path):
     data = pd.DataFrame()
-    for obs_type, obses in zip(('init', 'terminal'), (init_obses, terminal_obses)):
+    for obs_type, obses in zip(('initial', 'terminal'), (init_obses, terminal_obses)):
         for dim, vals in enumerate(obses.T):
             df = pd.DataFrame(dict(obs_type=obs_type, dim=dim, vals=vals))
             data = pd.concat([data, df], ignore_index=True)

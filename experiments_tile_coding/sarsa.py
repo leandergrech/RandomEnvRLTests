@@ -66,6 +66,7 @@ def train_instance(**kwargs):
     '''
     all_ep_lens = []
     all_returns = []
+    all_regrets = []
     iht_counts = []
 
     init_state_func = kwargs.get('init_state_func')
@@ -97,11 +98,12 @@ def train_instance(**kwargs):
             a = a_
 
         if (T + 1) % eval_every == 0:
-            _, returns, ep_lens = eval_agent(eval_env, q, kwargs.get('eval_eps'))
-            all_ep_lens.append(ep_lens)
-            all_returns.append(returns)
+            ret = eval_agent(eval_env, q, kwargs.get('eval_eps'), init_func=init_state_func)
+            all_ep_lens.append(ret['ep_lens'])
+            all_returns.append(ret['returns'])
+            all_regrets.append(ret['regrets'])
             iht_counts.append(tilings.count())
-            # make_state_violins(eval_obses['initial_observations'], eval_obses['terminal_observations'], os.path.join(results_path, 'obses_violins', f'step-{T}.png'))
+
         if (T + 1) % kwargs['save_every'] == 0 or T == 0:
             save_dir = kwargs.get('results_path')
             save_dir = os.path.join(save_dir, 'q_func')
@@ -111,7 +113,7 @@ def train_instance(**kwargs):
             save_path = os.path.join(save_dir, f'q_step_{T}.pkl')
             q.save(save_path)
 
-    return iht_counts, all_ep_lens, all_returns
+    return dict(iht_counts=iht_counts, ep_lens=all_ep_lens, returns=all_returns, regrets=all_regrets)
 
 
 

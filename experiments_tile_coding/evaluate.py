@@ -17,6 +17,11 @@ from utils.eval_utils import play_episode
 from utils.eval_utils import get_q_func_filenames, get_q_func_xrange, get_val, get_q_func_step
 
 
+def y_grid_on(ax):
+    ax.minorticks_on()
+    ax.grid(visible=True, which='major', axis='y')
+    ax.yaxis.grid(visible=True, which='minor', c='gray', ls='--')
+
 def unpack_stats(arr, key, rolling):
     s = Series([item[key] for item in arr])
     return s.rolling(rolling).mean()
@@ -32,45 +37,45 @@ def get_eval_every_hack(yaml_path):
 SUB_EXP_COLORS = ['r', 'g', 'b', 'k'] # I never exceed 4 sub-experiments
 
 
-def plot_experiment_training_stats(exp_pardir, exp_subdirs, exp_labels):
-    """
-    Access training_stats.pkl for a single experiment and plot training stats.
-    Top plot:    IHT count evolution
-    Middle plot: Episode length mean+std obtained using latest q-table greedily
-    Bottom plot: Return mean obtained using latest q-table greedily
-    """
-    stats_files = [os.path.join(exp_pardir, subdir, 'training_stats.pkl') for subdir in exp_subdirs]
-
-    eval_every = get_eval_every_hack(os.path.join(exp_pardir, exp_subdirs[0], 'train_params.yml'))
-
-    fig, axs = plt.subplots(2, gridspec_kw=dict(height_ratios=[1,3]), figsize=(15, 10))
-    for label, pkl_fn, c in zip(exp_labels, stats_files, SUB_EXP_COLORS):
-        with open(pkl_fn, 'rb') as f:
-            data = pkl.load(f)
-            iht_counts = data['iht_counts']
-            el_stats = data['ep_lens']
-            returns = data['returns']
-
-            xrange = np.arange(len(iht_counts)) * eval_every
-
-            ax = axs[0]
-            ax.plot(xrange, iht_counts, label=label)
-            ax.set_title('IHT counts')
-            ax.set_ylabel('Nb tiles discovered')
-
-            ax = axs[1]
-            ax.plot(xrange, unpack_stats(el_stats, 'mean', 1), ls='dashed', c=c, label=f'{label} Mean')
-            ax.plot(xrange, unpack_stats(el_stats, 'median', 1), ls='solid', c=c, label=f'{label} Median')
-            ax.plot(xrange, unpack_stats(el_stats, 'min', 1), ls='dotted', c=c, label=f'{label} Min')
-            ax.plot(xrange, unpack_stats(el_stats, 'max', 1), ls='solid', lw=0.5, c=c, label=f'{label} Max')
-            ax.set_title('Using greedy policy')
-            ax.set_ylabel('Episode length')
-
-    for ax in axs:
-        ax.legend(loc='best', prop=dict(size=8))
-        ax.set_xlabel('Training steps')
-    fig.tight_layout()
-    plt.savefig(os.path.join(exp_pardir, 'training_stats.png'))
+# def plot_experiment_training_stats(exp_pardir, exp_subdirs, exp_labels):
+#     """
+#     Access training_stats.pkl for a single experiment and plot training stats.
+#     Top plot:    IHT count evolution
+#     Middle plot: Episode length mean+std obtained using latest q-table greedily
+#     Bottom plot: Return mean obtained using latest q-table greedily
+#     """
+#     stats_files = [os.path.join(exp_pardir, subdir, 'training_stats.pkl') for subdir in exp_subdirs]
+#
+#     eval_every = get_eval_every_hack(os.path.join(exp_pardir, exp_subdirs[0], 'train_params.yml'))
+#
+#     fig, axs = plt.subplots(4, gridspec_kw=dict(height_ratios=[1, 3]), figsize=(15, 10))
+#     for label, pkl_fn, c in zip(exp_labels, stats_files, SUB_EXP_COLORS):
+#         with open(pkl_fn, 'rb') as f:
+#             data = pkl.load(f)
+#             iht_counts = data['iht_counts']
+#             ep_lens = data['ep_lens']
+#             returns = data['returns']
+#             regrets = data['regrets']
+#
+#             xrange = np.arange(len(iht_counts)) * eval_every
+#
+#             ax = axs[0]
+#             ax.plot(xrange, iht_counts, label=label)
+#             ax.set_title('IHT counts')
+#             ax.set_ylabel('Nb tiles discovered')
+#
+#             ax = axs[1]
+#             ep_lens_mean = np.mean(ep_lens, axis=1)
+#             ep_lens_std = np.std(ep_lens, axis=1)
+#             ax.plot(xrange, ep_lens_mean, ls='dashed', c=c, label=f'{label} Mean')
+#             ax.set_title('Using greedy policy')
+#             ax.set_ylabel('Episode length')
+#
+#     for ax in axs:
+#         ax.legend(loc='best', prop=dict(size=8))
+#         ax.set_xlabel('Training steps')
+#     fig.tight_layout()
+#     plt.savefig(os.path.join(exp_pardir, 'training_stats.png'))
 
 
 def plot_all_experiments_training_stats(exp_pardir, exp_subdirs, exp_labels, exp_filter=''):
@@ -81,6 +86,7 @@ def plot_all_experiments_training_stats(exp_pardir, exp_subdirs, exp_labels, exp
         Middle plot: Episode length mean+std obtained using latest q-table greedily
         Bottom plot: Return mean obtained using latest q-table greedily
     """
+    regrets = defaultdict(list)
     returns = defaultdict(list)
     ep_lens = defaultdict(list)
     iht_counts = defaultdict(list)
@@ -106,6 +112,7 @@ def plot_all_experiments_training_stats(exp_pardir, exp_subdirs, exp_labels, exp
             with open(pkl_file, 'rb') as f:
                 data = pkl.load(f)
 
+                regrets[sub_exp].append(data['regrets'])
                 returns[sub_exp].append(data['returns'])
                 ep_lens[sub_exp].append(data['ep_lens'])
                 iht_counts[sub_exp].append(data['iht_counts'])
@@ -115,50 +122,48 @@ def plot_all_experiments_training_stats(exp_pardir, exp_subdirs, exp_labels, exp
 
     print(f'Found {len(all_exp)} experiments')
 
-    fig, axs = plt.subplots(3, gridspec_kw=dict(height_ratios=[1, 3, 3]), figsize=(15, 10))
+    fig, axs = plt.subplots(4, gridspec_kw=dict(height_ratios=[1, 3, 3, 3]), figsize=(15, 10))
     for label, sub_exp, c in zip(exp_labels, exp_subdirs, SUB_EXP_COLORS):
-        rets = returns[sub_exp]
-        rets_mean = np.mean(np.mean(rets, axis=-1), axis=0)
-        rets_std = np.sqrt(np.mean(np.square(np.std(rets, axis=-1)), axis=0))
+        ihts= iht_counts[sub_exp]
+        iht_mean = np.mean(ihts, axis=0)
 
         els = ep_lens[sub_exp]
         el_mean = np.mean(np.mean(els, axis=-1), axis=0)
         el_std = np.sqrt(np.mean(np.square(np.std(els, axis=-1)), axis=0))
 
-        ihts= iht_counts[sub_exp]
-        iht_mean = np.mean(ihts, axis=0)
-        iht_std = np.std(ihts, axis=0)
+        rets = returns[sub_exp]
+        rets_mean = np.mean(np.mean(rets, axis=-1), axis=0)
+        rets_std = np.sqrt(np.mean(np.square(np.std(rets, axis=-1)), axis=0))
+
+        regs = regrets[sub_exp]
+        regs_mean = np.mean(np.mean(regs, axis=-1), axis=0)
+        regs_std = np.sqrt(np.mean(np.square(np.std(regs, axis=-1)), axis=0))
 
         ax = axs[0]
         ax.plot(xrange, iht_mean, ls='solid', c=c, label=f'{label} ' + r'$\mu$')
-        # ax.plot(xrange, iht_mean - iht_std, ls='dotted', c=c, label=f'{label} ' + r'$\mu-\sigma$', alpha=0.6)
-        # ax.plot(xrange, iht_mean + iht_std, ls='dashed', c=c, label=f'{label} ' + r'$\mu+\sigma$', alpha=0.6)
         ax.set_title('IHT counts')
         ax.set_ylabel('Nb tiles discovered')
-        # ax.set_yscale('log')
-        # ax.set_xscale('log')
 
         ax = axs[1]
         ax.plot(xrange, el_mean, ls='solid', c=c, label=f'{label} ' + r'$\mu$')
-        ax.plot(xrange, el_mean-el_std, ls='dotted', c=c, label=f'{label} ' + r'$\mu-\sigma$')
-        ax.plot(xrange, el_mean+el_std, ls='dashed', c=c, label=f'{label} ' + r'$\mu+\sigma$')
-        ax.set_title('Using greedy policy')
+        ax.fill_between(xrange, el_mean - el_std, el_mean + el_std, facecolor='None', edgecolor=c, hatch='//', alpha=0.6)
+        # ax.set_title('Using greedy policy')
         ax.set_ylabel('Episode length')
 
         ax = axs[2]
         ax.plot(xrange, rets_mean, ls='solid', c=c, label=f'{label} ' + r'$\mu$')
-        # ax.plot(xrange, rets_mean - rets_std, ls='dotted', c=c, label=f'{label} ' + r'$\mu-\sigma$')
-        # ax.plot(xrange, rets_mean + rets_std, ls='dashed', c=c, label=f'{label} ' + r'$\mu+\sigma$')
+        # ax.fill_between(xrange, rets_mean - rets_std, rets_mean + rets_std, facecolor='None', edgecolor=c, hatch='//', alpha=0.6)
         ax.set_yscale('symlog')
-        ax.minorticks_on()
-        ax.grid(visible=True, which='major', axis='y')
-        ax.yaxis.grid(visible=True, which='minor', c='gray', ls='--')
         ax.set_ylabel('Returns')
-        # ax.set_yscale('log')
-        # ax.set_xscale('log')
+
+        ax = axs[3]
+        ax.plot(xrange, regs_mean, ls='solid', c=c, label=f'{label} ' + r'$\mu$')
+        # ax.fill_between(xrange, regs_mean - regs_std, regs_mean + regs_std, facecolor='None', edgecolor=c, hatch='//', alpha=0.6)
+        ax.set_ylabel('Regrets')
 
     for ax in axs:
         ax.legend(loc='best', prop=dict(size=10))
+        y_grid_on(ax)
         ax.set_xlabel('Training steps')
     fig.suptitle(f'{len(all_exp)} different environments')
     fig.tight_layout()
@@ -238,18 +243,6 @@ def circular_normal_sample(r, s):
         return [R * np.cos(theta), R * np.sin(theta)]
     else:
         return np.random.normal(r, s, 2)
-
-
-def nball_uniform_sample(dim, rlow, rhigh):
-    X = np.random.uniform(-1, 1, dim)
-    R = np.sqrt(np.sum(np.square(X)))  # Sampled point lies on n-ball with radius R
-    X /= R  # Now point lies on unit n-ball surface
-
-    M = np.random.uniform(rlow, rhigh)  # Magnitude sampled from uni. dist. to get rlow-rhigh band
-    return X * M
-    #
-    # theta = 2 * np.pi * np.random.rand()
-    # return [R * np.cos(theta), R * np.sin(theta)]
 
 
 def plot_q_vals_region_sampling_tracking_states(experiment_dir, env_type=REDA, save_dir=None):

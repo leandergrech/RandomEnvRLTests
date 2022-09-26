@@ -5,7 +5,9 @@ import matplotlib as mpl
 from collections import defaultdict
 from tqdm import trange
 from random_env.envs import RandomEnvDiscreteActions as REDA, VREDA, get_discrete_actions, REDAClip
+from utils.training_utils import InitSolvableState
 import yaml
+
 
 def quick_testing_randomenvdiscreteactions():
     n_obs = 5
@@ -69,7 +71,7 @@ def testing_vreda_velocities():
     print(f'Average velocity = {np.mean(vels)}')
     print(f'Min velocity = {np.min(vels)}')
     print(f'Max velocity = {np.max(vels)}')
-# plt.show()
+
 
 def testing_vreda_eplens():
     env = VREDA(2, 2)
@@ -109,6 +111,7 @@ def testing_vreda_eplens():
         fig.tight_layout()
         plt.savefig(os.path.join('vreda_eplens', f'{trim_factor:.2f}.png'))
     plt.show()
+
 
 def vreda_diagnostic_plots():
     env = VREDA(2, 2)
@@ -218,26 +221,26 @@ def testing_reda_trims():
     plt.show()
 
 
-def testing_reda_optimal_policy():
-    n_obs, n_act = 2, 2
+def testing_reda_optimal_policy_2d():
+    n_obs, n_act = 3, 2
     env = REDA(n_obs, n_act)
     nb_eps = 30
-    def init_state(ep):
-        r = np.random.normal(0.8, 0.1)
-        theta = 2 * np.pi * (ep/nb_eps)#np.random.rand()
-        return np.array([r * np.cos(theta), r * np.sin(theta)])
+
+    init_func = InitSolvableState(env)
 
     cmap = mpl.cm.get_cmap('hsv')
     fig, ax = plt.subplots()
+
     ax.add_patch(plt.Circle((0, 0), env.GOAL, edgecolor='g', facecolor='None', ls='--', label='Threshold', zorder=20, lw=1.5))
     for ep, c in enumerate(np.linspace(0, 1, nb_eps)):
-        o = env.reset(init_state(ep))
+        o = env.reset(init_func())
         d = False
         obses = [o.copy()]
         label = 'Initial state' if ep == 0 else None
-        ax.scatter(o[0],o[1], marker='o', c='k', label=label, zorder=15)
+        ax.scatter(o[0], o[1], marker='o', c='k', label=label, zorder=15)
         while not d:
-            otp1, _, d, _ = env.step(env.get_optimal_action(o))
+            a = env.get_optimal_action(o)
+            otp1, _, d, _ = env.step(a)
             obses.append(otp1.copy())
             o = otp1
         obses = np.array(obses).T
@@ -247,6 +250,46 @@ def testing_reda_optimal_policy():
     ax.set_title(f'{repr(env)}\n'
                  f'Optimal policy derived from linear dynamics')
     plt.legend(loc='best')
+    fig.tight_layout()
+    plt.show()
+
+
+def testing_reda_optimal_policy_bars():
+    n_obs, n_act = 3, 2
+    env = REDA(n_obs, n_act)
+
+    # init_func = env.reset
+    init_func = InitSolvableState(env)
+
+    fig, axs = plt.subplots(2)
+
+    obs_bars = axs[0].bar(range(n_obs), np.zeros(n_obs), facecolor='b')
+    axs[0].axhline(-env.GOAL, color='g', ls='--')
+    axs[0].axhline(env.GOAL, color='g', ls='--')
+    act_bars = axs[1].bar(range(n_act), np.zeros(n_act), facecolor='r')
+    for ax in axs:
+        ax.set_ylim((-1, 1))
+    plt.ion()
+
+    o = env.reset(init_func())
+    d = False
+    step = 0
+    while not d:
+        a = env.get_optimal_action(o)
+        otp1, _, d, _ = env.step(a)
+
+        o = otp1
+        step += 1
+
+        fig.suptitle(step)
+        for bars, data in zip((obs_bars, act_bars), (o, np.subtract(a, 1))):
+            for bar, datum in zip(bars, data):
+                bar.set_height(datum)
+        plt.pause(.1)
+    plt.ioff()
+
+    fig.suptitle(f'{repr(env)}\n'
+                 f'Optimal policy derived from linear dynamics')
     fig.tight_layout()
     plt.show()
 
@@ -272,5 +315,5 @@ if __name__ == '__main__':
     # testing_vreda_eplens()
     # vreda_diagnostic_plots()
     # testing_reda_trims()
-    # testing_reda_optimal_policy()
-    testing_redaclip_yaml()
+    testing_reda_optimal_policy_bars()
+    # testing_redaclip_yaml()

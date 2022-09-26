@@ -13,4 +13,4 @@ if __name__ == '__main__':
         '4obsx2act',
         '5obsx2act',
     ]
-    plot_all_experiments_training_stats('.', exp_subdirs, exp_labels)
+    plot_all_experiments_training_stats('.', exp_subdirs, exp_labels, exp_filter='')

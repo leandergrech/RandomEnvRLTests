@@ -1,5 +1,6 @@
 import numpy as np
 import yaml
+from random_env.envs.random_env_discrete_actions import get_discrete_actions
 
 
 def init_label(label):
@@ -163,6 +164,39 @@ def circular_initial_state_distribution_2d():
     return np.array([r * np.cos(theta), r * np.sin(theta)])
     # return np.random.uniform(-1, 1, 3)
 
+
+def nball_uniform_sample(N, rlow, rhigh):
+    X = np.random.uniform(-1, 1, N)  # Sample point from N-dimensional space
+    R = np.sqrt(np.sum(np.square(X)))  # Sampled point lies on N-ball with radius R
+
+    A = np.random.uniform(rlow, rhigh)  # Magnitude sampled from uni. dist. to get rlow-rhigh band
+    return (X * A) / R  # Normalise and multiply by sampled magnitude
+
+
+class InitSolvableState:
+    """
+        Initialised by passing the REDA-type environment.
+        Calling its instance will return a solvable initial state.
+        Ensures that if n_obs > n_act, the initial state will lie on a solvable hyperplane with the same
+        dimensions as the action space.
+    """
+    def __init__(self, env, init_thresh=0.5):
+        self.env = env
+        self.actions = get_discrete_actions(env.act_dimension, 3)
+        self.nb_actions = len(self.actions)
+        self.init_state_mag_thresh = init_thresh  # Initial state guaranteed to have magnitude larger than this
+
+    def __call__(self, *args, **kwargs):
+        # Initialise state within threshold n-ball - more variety in final state since actions are discrete
+        init_state = nball_uniform_sample(self.env.obs_dimension, 0.0, self.env.GOAL / 2)
+
+        # Move away from the optimal state with a random agent
+        self.env.reset(init_state)
+        while True:
+            a = self.env.action_space.sample()
+            otp1, *_ = self.env.step(a)
+            if np.sqrt(np.mean(np.square(otp1))) > self.init_state_mag_thresh:
+                return otp1
 
 class TrajSimple:
     def __init__(self):

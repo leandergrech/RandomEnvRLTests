@@ -1,5 +1,4 @@
 import os
-
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 from tensorlayer.optimizers import AMSGrad
@@ -8,20 +7,18 @@ from rlzoo.algorithms import TRPO
 from rlzoo.common.value_networks import ValueNetwork
 from rlzoo.common.policy_networks import StochasticPolicyNetwork
 
-from gym.spaces import Dict as GymDict
-
 from random_env.envs import RandomEnv
 
-n_obs, n_act = 5, 5
-env = RandomEnv(n_obs, n_act, estimate_scaling=True)
+n_obs, n_act = 16, 2
+env = RandomEnv(n_obs, n_act, estimate_scaling=False)
 
-# state_space = GymDict({'state': env.observation_space})
 state_space = env.observation_space
+action_space = env.action_space
 
 critic_model = ValueNetwork(state_space=state_space,
                             hidden_dim_list=[50, 50])
 policy_model = StochasticPolicyNetwork(state_space=state_space,
-                                       action_space=env.action_space,
+                                       action_space=action_space,
                                        hidden_dim_list=[50, 50])
 
 optimizers_list = [AMSGrad(learning_rate=1e-2)]
