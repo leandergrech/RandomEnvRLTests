@@ -30,7 +30,7 @@ class RandomEnv(Env):
         :param seed:
         """
         super(RandomEnv, self).__init__()
-        self.REWARD_SCALE = 0.05
+        self.REWARD_SCALE = 1.0 # 0.05
         # Have many times smaller should the average state trim be than an state space bounds
         self.TRIM_FACTOR = 5.
         self.EPISODE_LENGTH_LIMIT = 100
@@ -114,19 +114,20 @@ class RandomEnv(Env):
 
     # @staticmethod
     def objective(self, state):
-        state_reward = -np.sum(np.square(state)) / self.obs_dimension
-        # state_reward = -np.sqrt(np.mean(np.square(state)))
+        # state_reward = -np.sum(np.square(state)) / self.obs_dimension
+        state_reward = -np.sqrt(np.mean(np.square(state)))
         return state_reward * self.REWARD_SCALE
 
     def _is_done(self):
         done, success = False, False
         # Reach goal
-        state_mag = np.sqrt(np.sum(np.square(self.current_state)))
+        maxabs_state = np.max(np.abs(self.current_state))
         if len(self.reward_deque) >= RandomEnv.REWARD_DEQUE_SIZE and \
-                state_mag <= self.GOAL:
+                maxabs_state <= self.GOAL:
             done, success = True, True
         elif self._it >= self.EPISODE_LENGTH_LIMIT - 1:
             done = True
+
         return done, success
 
     def get_optimal_action(self, state, state_clip=None):
@@ -163,7 +164,6 @@ class RandomEnv(Env):
             self.pi = 1/self.rm
 
             return
-
 
         # Instantiate left & right singular vectors, and singular value matrices
         u = stats.ortho_group.rvs(n_obs)

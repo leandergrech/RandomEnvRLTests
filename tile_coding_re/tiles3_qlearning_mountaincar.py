@@ -5,7 +5,7 @@ from tqdm import trange
 from pandas import Series
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
 from random_env.envs import get_discrete_actions
-from utils.heatmap_utils import make_heatmap, update_heatmap
+from utils.plotting_utils import make_heatmap, update_heatmap
 # from tile_coding_re.training_utils import lr
 import gym
 

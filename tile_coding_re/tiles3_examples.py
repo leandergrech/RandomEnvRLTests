@@ -1,7 +1,7 @@
 from numpy import linspace
 from numpy.random import randn
 from tiles3 import tiles, IHT, tilesasymmetric
-from utils.heatmap_utils import *
+from utils.plotting_utils import *
 from utils.training_utils import lr
 
 

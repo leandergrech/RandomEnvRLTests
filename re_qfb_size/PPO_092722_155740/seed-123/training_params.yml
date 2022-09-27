@@ -1,0 +1,11 @@
+policy_kwargs:
+  net_arch:
+  - pi:
+    - 100
+    - 100
+  - vf:
+    - 100
+    - 100
+seed: 123
+tensorboard_log: PPO_092722_155740/seed-123/logs
+verbose: 2

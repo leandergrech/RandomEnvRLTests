@@ -255,41 +255,48 @@ def testing_reda_optimal_policy_2d():
 
 
 def testing_reda_optimal_policy_bars():
-    n_obs, n_act = 3, 2
-    env = REDA(n_obs, n_act)
+    from random_env.envs import RandomEnv
+    n_obs, n_act = 10, 10
+    # env = REDA(n_obs, n_act)
+    env = RandomEnv(n_obs, n_act)
 
     # init_func = env.reset
     init_func = InitSolvableState(env)
 
     fig, axs = plt.subplots(2)
 
-    obs_bars = axs[0].bar(range(n_obs), np.zeros(n_obs), facecolor='b')
+    o = env.reset(init_func())
+
+    obs_bars = axs[0].bar(range(n_obs), o, facecolor='b')
     axs[0].axhline(-env.GOAL, color='g', ls='--')
     axs[0].axhline(env.GOAL, color='g', ls='--')
     act_bars = axs[1].bar(range(n_act), np.zeros(n_act), facecolor='r')
     for ax in axs:
         ax.set_ylim((-1, 1))
     plt.ion()
+    plt.pause(1)
 
-    o = env.reset(init_func())
     d = False
     step = 0
     while not d:
         a = env.get_optimal_action(o)
+        a /= np.max([1, np.max(np.abs(a))])
+        a *= 0.1
         otp1, _, d, _ = env.step(a)
 
         o = otp1
         step += 1
 
         fig.suptitle(step)
-        for bars, data in zip((obs_bars, act_bars), (o, np.subtract(a, 1))):
+        for bars, data in zip((obs_bars, act_bars), (o, a)):
             for bar, datum in zip(bars, data):
                 bar.set_height(datum)
-        plt.pause(.1)
+        plt.pause(1)
     plt.ioff()
 
     fig.suptitle(f'{repr(env)}\n'
-                 f'Optimal policy derived from linear dynamics')
+                 f'Optimal policy derived from linear dynamics\n'
+                 f'Steps taken = {step}')
     fig.tight_layout()
     plt.show()
 

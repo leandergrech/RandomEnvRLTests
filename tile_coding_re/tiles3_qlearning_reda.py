@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from tqdm import trange
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
 from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
-from utils.heatmap_utils import make_heatmap, update_heatmap
+from utils.plotting_utils import make_heatmap, update_heatmap
 # from tile_coding_re.training_utils import lr
 from copy import deepcopy
 

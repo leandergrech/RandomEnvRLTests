@@ -10,7 +10,7 @@ from tqdm import trange
 from random_env.envs.random_env_discrete_actions import REDAClip, get_discrete_actions
 from utils.eval_utils import play_episode, eval_agent
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
-from utils.heatmap_utils import make_heatmap
+from utils.plotting_utils import make_heatmap
 
 
 class OptimalAgentWrapper:

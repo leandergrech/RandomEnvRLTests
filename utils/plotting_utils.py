@@ -1,6 +1,10 @@
 import matplotlib.pyplot as plt
 from numpy import nanmin as npmin, nanmax as npmax, array
 
+def y_grid_on(ax):
+    ax.minorticks_on()
+    ax.grid(visible=True, which='major', axis='y')
+    ax.yaxis.grid(visible=True, which='minor', c='gray', ls='--', alpha=0.5)
 
 def get_min_and_max(xrange):
     return npmin(xrange), npmax(xrange)
