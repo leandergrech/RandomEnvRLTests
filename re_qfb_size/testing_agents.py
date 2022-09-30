@@ -2,18 +2,25 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from stable_baselines3 import PPO
+from sb3_contrib import TRPO
 from random_env.envs import RandomEnv
 from utils.plotting_utils import y_grid_on
 
 # experiment_name = 'PPO_092722_173143'
 # experiment_name = 'PPO_092722_195643'
-experiment_name = 'PPO_092722_203511'
+# experiment_name = 'PPO_092722_203511'
+experiment_name = 'TRPO_092922_174343'
 sub_experiment_name = 'seed-123'
-training_step = 170000
+training_step = 89000
+
+if 'PPO' in experiment_name:
+    agent_type = PPO
+elif 'TRPO' in experiment_name:
+    agent_type = TRPO
 
 model_path = os.path.join(experiment_name, sub_experiment_name, 'saves', f'rl_model_{training_step}_steps.zip')
 env_path = experiment_name
-model = PPO.load(model_path)
+model = agent_type.load(model_path)
 
 env = RandomEnv.load_from_dir(env_path)
 n_obs, n_act = env.obs_dimension, env.act_dimension
