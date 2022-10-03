@@ -256,9 +256,10 @@ def testing_reda_optimal_policy_2d():
 
 def testing_reda_optimal_policy_bars():
     from random_env.envs import RandomEnv
-    n_obs, n_act = 10, 10
+    n_obs, n_act = 15, 15
     # env = REDA(n_obs, n_act)
     env = RandomEnv(n_obs, n_act)
+    env.load_dynamics('../common_envs')
 
     # init_func = env.reset
     init_func = InitSolvableState(env)
@@ -281,7 +282,7 @@ def testing_reda_optimal_policy_bars():
     while not d:
         a = env.get_optimal_action(o)
         a /= np.max([1, np.max(np.abs(a))])
-        a *= 0.1
+        a *= 0.3
         otp1, _, d, _ = env.step(a)
 
         o = otp1

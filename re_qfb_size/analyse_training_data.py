@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 
 from utils.plotting_utils import y_grid_on
 
-# experiment_name = 'PPO_092722_203511'
-experiment_name = 'TRPO_092922_185111'
+experiment_name = 'PPO_100122_020616'
+# experiment_name = 'TRPO_092922_185111'
 
 tags = ['ep_length', 'reward']
 

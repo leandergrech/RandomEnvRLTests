@@ -113,15 +113,16 @@ experiment_name = f"PPO_{dt.strftime(dt.now(), '%m%d%y_%H%M%S')}"
 if not os.path.exists(experiment_name):
     os.makedirs(experiment_name)
 
-n_obs = 10
-n_act = 10
+n_obs = 15
+n_act = 15
 env = RandomEnv(n_obs=n_obs, n_act=n_act, estimate_scaling=False)
+env.load_dynamics('../common_envs') # for testing puposes, use the same environment. Create it here if it doesn't exist s'il vous plait
 env.save_dynamics(experiment_name)
 eval_env = RandomEnv(env.obs_dimension, env.act_dimension, False, model_info=env.model_info)
 
-nb_steps = int(4e5)
+nb_steps = int(3e5)
 
-for random_seed in (123,):# 234, 345, 456, 567):
+for random_seed in (123, 234, 345, 456, 567):
     model_name = f"seed-{random_seed}"
 
     model_dir = os.path.join(experiment_name, model_name)
@@ -143,16 +144,16 @@ for random_seed in (123,):# 234, 345, 456, 567):
         # max_grad_norm=0.5,
         # clip_range=0.2,
         use_sde=True,
-        sde_sample_freq=200,
-        policy_kwargs={'net_arch': [{'pi': [100, 100]},
-                                    {'vf': [100, 100]}]},
+        sde_sample_freq=100,
+        policy_kwargs={
+            'net_arch': [{'pi': [100, 100]},
+                         {'vf': [100, 100]}]},
         verbose=2,
         seed=random_seed,
         tensorboard_log=log_dir
     )
     model = PPO(PPOPolicy, env, **ppo_params)
-    # eval_callback = EvaluationAndCheckpointCallback(eval_env, save_dir=save_dir,
-    #                                                 EVAL_FREQ=100, CHKPT_FREQ=1000)
+
     chkpt_callback = CheckpointCallback(save_freq=1000, save_path=save_dir)
     callbacks = chkpt_callback
     with open(os.path.join(model_dir, 'training_params.yml'), 'w') as f:
@@ -160,7 +161,7 @@ for random_seed in (123,):# 234, 345, 456, 567):
 
     model.learn(total_timesteps=nb_steps, log_interval=10, reset_num_timesteps=True,
                 tb_log_name=model_name, callback=callbacks,
-                eval_freq=100, eval_env=eval_env)
+                eval_freq=100, n_eval_episodes=5, eval_env=eval_env)
 
     save_path = os.path.join(save_dir, f'{model_name}_final')
     model.save(save_path)

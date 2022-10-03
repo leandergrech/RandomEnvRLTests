@@ -6,32 +6,27 @@ from sb3_contrib import TRPO
 from random_env.envs import RandomEnv
 from utils.plotting_utils import y_grid_on
 
-# experiment_name = 'PPO_092722_173143'
-# experiment_name = 'PPO_092722_195643'
-# experiment_name = 'PPO_092722_203511'
-experiment_name = 'TRPO_092922_174343'
-sub_experiment_name = 'seed-123'
-training_step = 89000
 
-if 'PPO' in experiment_name:
-    agent_type = PPO
-elif 'TRPO' in experiment_name:
-    agent_type = TRPO
+def load_stuff(exp_name, sub_exp_name, train_step):
+    if 'PPO' in exp_name:
+        agent_type = PPO
+    elif 'TRPO' in exp_name:
+        agent_type = TRPO
 
-model_path = os.path.join(experiment_name, sub_experiment_name, 'saves', f'rl_model_{training_step}_steps.zip')
-env_path = experiment_name
-model = agent_type.load(model_path)
+    model_path = os.path.join(exp_name, sub_exp_name, 'saves', f'rl_model_{train_step}_steps.zip')
+    env_path = exp_name
+    model = agent_type.load(model_path)
 
-env = RandomEnv.load_from_dir(env_path)
-n_obs, n_act = env.obs_dimension, env.act_dimension
+    env = RandomEnv.load_from_dir(env_path)
 
-init_func = env.reset
-# init_func = InitSolvableState(env)
+    return env, model
 
 
-def plot_episodes():
-    nrows = 2
-    ncols = 4
+def plot_episodes(exp_name, sub_exp_name, train_step, nrows=2, ncols=4):
+    env, model = load_stuff(exp_name, sub_exp_name, train_step)
+    n_obs, n_act = env.obs_dimension, env.act_dimension
+    init_func = env.reset
+
     fig, axs = plt.subplots(nrows * 2, ncols, figsize=(30, 15))
     # axs = np.ravel(axs)
     nb_eps = nrows * ncols
@@ -73,15 +68,19 @@ def plot_episodes():
             ax.set_xlabel('Step', size=12)
 
     fig.suptitle(f'Environment: {repr(env)}\n'
-                 f'Experiment:  {experiment_name}\n'
-                 f'Sub-exp:     {sub_experiment_name}\n'
-                 f'At step:     {training_step}')
+                 f'Experiment:  {exp_name}\n'
+                 f'Sub-exp:     {sub_exp_name}\n'
+                 f'At step:     {train_step}')
     fig.tight_layout()
-    fig.savefig(os.path.join(experiment_name, f'{sub_experiment_name}_{training_step}_step.png'))
+    fig.savefig(os.path.join(exp_name, f'{sub_exp_name}_{train_step}_step.png'))
     plt.show()
 
 
-def plot_episode_ion():
+def plot_episode_ion(exp_name, sub_exp_name, train_step):
+    env, model = load_stuff(exp_name, sub_exp_name, train_step)
+    n_obs, n_act = env.obs_dimension, env.act_dimension
+    init_func = env.reset
+
     fig, axs = plt.subplots(2, figsize=(30, 15))
 
     o = env.reset(init_func())
@@ -122,4 +121,9 @@ def plot_episode_ion():
 
 
 if __name__ == '__main__':
-    plot_episodes()
+    experiment_name = 'PPO_100122_020616'
+    # experiment_name = 'TRPO_092922_174343'
+    sub_experiment_name = 'seed-123'
+    training_step = 191000
+
+    plot_episodes(experiment_name, sub_experiment_name, training_step)

@@ -9,7 +9,7 @@ def quick_testing_randomenv():
     n_act = 10
 
     # env = RandomEnv(n_obs, n_act, estimate_scaling=True)
-    env = RandomEnv.load_from_dir("C:\\Users\\Leander\\Code\\RandomEnvRLTests\\common_envs")
+    env = RandomEnv.load_from_dir('../common_envs')
 
     d = False
     o1 = env.reset()
@@ -80,6 +80,6 @@ def testing_state_initialisation_schemes():
 
 
 if __name__ == '__main__':
-    # quick_testing_randomenv()
+    quick_testing_randomenv()
     # env = RandomEnv.load_from_dir('common_envs')
-    testing_state_initialisation_schemes()
+    # testing_state_initialisation_schemes()
