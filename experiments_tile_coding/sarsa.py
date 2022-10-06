@@ -83,7 +83,6 @@ def train_instance(**kwargs):
         exploration = exp_fun(T)
         a_ = policy(otp1, q, exploration)
 
-
         target = r + gamma * q.value(otp1, a_)
 
         # td_errors[T] = q.update(o, a, target, lr_fun(T))

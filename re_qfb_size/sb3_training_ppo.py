@@ -7,6 +7,7 @@ from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.ppo.policies import MlpPolicy as PPOPolicy
 
 from random_env.envs import RandomEnv
+from other_random_env import NoisyRE
 from utils.training_utils import InitSolvableState
 """
 This scipt is derived directly from the PPO training done in for the PhD on QFBEnv:
@@ -109,16 +110,18 @@ https://github.com/leandergrech/rl-qfb/blob/master/qfb_training.py
 #         self.noise_sigma = noise_sigma
 
 
-experiment_name = f"PPO_{dt.strftime(dt.now(), '%m%d%y_%H%M%S')}"
+experiment_name = f"PPO_NoisyRE_{dt.strftime(dt.now(), '%m%d%y_%H%M%S')}"
 if not os.path.exists(experiment_name):
     os.makedirs(experiment_name)
 
-n_obs = 15
-n_act = 15
-env = RandomEnv(n_obs=n_obs, n_act=n_act, estimate_scaling=False)
+env_type = NoisyRE
+
+n_obs = 10
+n_act = 10
+env = env_type(n_obs=n_obs, n_act=n_act, estimate_scaling=False)
 env.load_dynamics('../common_envs') # for testing puposes, use the same environment. Create it here if it doesn't exist s'il vous plait
 env.save_dynamics(experiment_name)
-eval_env = RandomEnv(env.obs_dimension, env.act_dimension, False, model_info=env.model_info)
+eval_env = env_type(env.obs_dimension, env.act_dimension, False, model_info=env.model_info)
 
 nb_steps = int(3e5)
 
@@ -146,8 +149,8 @@ for random_seed in (123, 234, 345, 456, 567):
         use_sde=True,
         sde_sample_freq=100,
         policy_kwargs={
-            'net_arch': [{'pi': [100, 100]},
-                         {'vf': [100, 100]}]},
+            'net_arch': [{'pi': [10, 10]},
+                         {'vf': [50, 10]}]},
         verbose=2,
         seed=random_seed,
         tensorboard_log=log_dir
