@@ -1,0 +1,13 @@
+policy_kwargs:
+  net_arch:
+  - pi:
+    - 10
+    - 10
+  - vf:
+    - 50
+    - 10
+sde_sample_freq: 100
+seed: 345
+tensorboard_log: PPO_NoisyRE_100622_172723/seed-345/logs
+use_sde: true
+verbose: 2

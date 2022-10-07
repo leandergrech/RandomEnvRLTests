@@ -1,0 +1,13 @@
+policy_kwargs:
+  net_arch:
+  - pi:
+    - 10
+    - 10
+  - vf:
+    - 50
+    - 10
+sde_sample_freq: 100
+seed: 567
+tensorboard_log: PPO_100522_170900/seed-567/logs
+use_sde: true
+verbose: 2
