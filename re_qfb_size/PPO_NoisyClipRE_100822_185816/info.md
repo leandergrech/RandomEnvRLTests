@@ -1,0 +1,1 @@
+every time the max(abs(state)) exceeds 1 episode ends with info['success']=False

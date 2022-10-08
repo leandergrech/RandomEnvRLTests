@@ -7,10 +7,10 @@ from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.ppo.policies import MlpPolicy as PPOPolicy
 
 from random_env.envs import RandomEnv
-from other_random_env import NoisyRE
+from other_random_env import NoisyRE, NoisyClipRE
 from utils.training_utils import InitSolvableState
 """
-This scipt is derived directly from the PPO training done in for the PhD on QFBEnv:
+This script is derived directly from the PPO training done in for the PhD on QFBEnv:
 https://github.com/leandergrech/rl-qfb/blob/master/qfb_training.py
 """
 
@@ -110,22 +110,26 @@ https://github.com/leandergrech/rl-qfb/blob/master/qfb_training.py
 #         self.noise_sigma = noise_sigma
 
 
-experiment_name = f"PPO_NoisyRE_{dt.strftime(dt.now(), '%m%d%y_%H%M%S')}"
-if not os.path.exists(experiment_name):
-    os.makedirs(experiment_name)
-
-env_type = NoisyRE
-
+env_type = NoisyClipRE
+env_kwargs = dict(action_noise=0.08, estimate_scaling=False)
+eval_env_kwargs = dict(action_noise=0.0, estimate_scaling=False)
 n_obs = 10
 n_act = 10
-env = env_type(n_obs=n_obs, n_act=n_act, estimate_scaling=False)
-env.load_dynamics('../common_envs') # for testing puposes, use the same environment. Create it here if it doesn't exist s'il vous plait
-env.save_dynamics(experiment_name)
-eval_env = env_type(env.obs_dimension, env.act_dimension, False, model_info=env.model_info)
+env = env_type(n_obs=n_obs, n_act=n_act, **env_kwargs)
+env.load_dynamics('../common_envs')  # Use the same environment. Create it here if it doesn't exist s'il vous plait
+eval_env = env_type(env.obs_dimension, env.act_dimension, model_info=env.model_info, **eval_env_kwargs)
+
+experiment_name = f"PPO_{repr(env).split('_')[0]}_{dt.strftime(dt.now(), '%m%d%y_%H%M%S')}"
+
+if not os.path.exists(experiment_name):
+    os.makedirs(experiment_name)
+env.save_dynamics(experiment_name)  # Save copy of environment in the experiment for safe-keeping
+
 
 nb_steps = int(3e5)
 
-for random_seed in (123, 234, 345, 456, 567):
+for random_seed in np.random.choice(1000, 1):#(123, 234, 345, 456, 567, 678, 789, 890, 901, 12):
+    random_seed = int(random_seed)
     model_name = f"seed-{random_seed}"
 
     model_dir = os.path.join(experiment_name, model_name)
@@ -146,8 +150,8 @@ for random_seed in (123, 234, 345, 456, 567):
         # learning_rate=2.5e-4,
         # max_grad_norm=0.5,
         # clip_range=0.2,
-        use_sde=True,
-        sde_sample_freq=100,
+        # use_sde=True,
+        # sde_sample_freq=100,
         policy_kwargs={
             'net_arch': [{'pi': [10, 10]},
                          {'vf': [50, 10]}]},

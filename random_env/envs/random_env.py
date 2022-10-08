@@ -79,7 +79,7 @@ class RandomEnv(Env):
         if init_state is None:
             init_state = self.observation_space.sample()
 
-        # Large Envs require a solvable initial state - Solution, reach one through a random walk
+        # Large Envs with M>N require a solvable initial state - Solution, reach one through a random walk
         # init_state = np.zeros(self.obs_dimension)
         # for _ in range(RandomEnv.RESET_RANDOM_WALK_STEPS):
         # 	a = self.action_space.sample()

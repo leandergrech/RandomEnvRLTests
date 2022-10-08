@@ -32,3 +32,20 @@ class NoisyRE(RandomEnv):
 
         return None
 
+
+class NoisyClipRE(NoisyRE):
+    def step(self, action, deterministic=False):
+        old_o = self.current_state.copy()
+        otp1, r, d, info = super(NoisyClipRE, self).step(action, deterministic)
+        if max(abs(otp1)) > 1:
+            r = -10.0
+            self.current_state = otp1 = old_o
+
+        return otp1, r, d, info
+
+    def __repr__(self):
+        return f'NoisyClipRE_{self.obs_dimension}obsx{self.act_dimension}act_{self.action_noise}noise'
+
+if __name__ == '__main__':
+    env = NoisyClipRE(10, 10, 0.08)
+    env.save_dynamics('/home/leander/code/RandomEnvRLTests/common_envs')

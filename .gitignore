@@ -3,7 +3,6 @@
 __pycache__\
 *__pycache__*
 *training_session*
-*.pkl
 *egg-info*
 *events.out.tfevents*
 /random_env_modelling/re_trajs/
@@ -17,5 +16,6 @@ __pycache__\
 *.npz
 *REDA*
 *.ipynb_checkpoints*
+#*.pkl
 #*.yml
 #*.png

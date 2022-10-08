@@ -1,0 +1,1 @@
+every time the max(abs(state)) exceeds 1, reward is set to -1.0 & episode ends with info['success']=False

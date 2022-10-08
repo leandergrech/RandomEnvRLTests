@@ -4,26 +4,45 @@ import matplotlib.pyplot as plt
 from stable_baselines3 import PPO
 from sb3_contrib import TRPO
 from random_env.envs import RandomEnv
+from re_qfb_size.other_random_env import NoisyClipRE, NoisyRE
 from utils.plotting_utils import y_grid_on
 
 
-def load_stuff(exp_name, sub_exp_name, train_step):
+def load_agent(exp_name, sub_exp_name, train_step):
     if 'PPO' in exp_name:
         agent_type = PPO
     elif 'TRPO' in exp_name:
         agent_type = TRPO
 
     model_path = os.path.join(exp_name, sub_exp_name, 'saves', f'rl_model_{train_step}_steps.zip')
-    env_path = exp_name
     model = agent_type.load(model_path)
 
-    env = RandomEnv.load_from_dir(env_path)
-
-    return env, model
+    return model
 
 
-def plot_episodes(exp_name, sub_exp_name, train_step, nrows=2, ncols=4):
-    env, model = load_stuff(exp_name, sub_exp_name, train_step)
+class OptimalAgent:
+    def __init__(self, env):
+        self.env = env
+    def predict(self, state, deterministic=None):
+        return [self.env.get_optimal_action(state)]
+
+
+class RandomAgent:
+    def __init__(self, env):
+        self.env = env
+
+    def predict(self, state, deterministic=None):
+        return [self.env.action_space.sample()]
+
+
+def plot_episodes(exp_name, sub_exp_name, train_step, env, nrows=2, ncols=4):
+    if isinstance(train_step, int):
+        model = load_agent(exp_name, sub_exp_name, train_step)
+    elif 'optimal' in train_step:
+        model = OptimalAgent(env)
+    elif 'random' in train_step:
+        model = RandomAgent(env)
+
     n_obs, n_act = env.obs_dimension, env.act_dimension
     init_func = env.reset
 
@@ -65,7 +84,9 @@ def plot_episodes(exp_name, sub_exp_name, train_step, nrows=2, ncols=4):
             y_grid_on(ax)
             ax.set_xticks(np.arange(step))
             ax.set_ylabel(ylab, size=12)
-            ax.set_xlabel('Step', size=12)
+
+        ax_obs.get_shared_x_axes().join(ax_obs, ax_act)
+        ax_act.set_xlabel('Step', size=12)
 
     fig.suptitle(f'Environment: {repr(env)}\n'
                  f'Experiment:  {exp_name}\n'
@@ -76,8 +97,8 @@ def plot_episodes(exp_name, sub_exp_name, train_step, nrows=2, ncols=4):
     plt.show()
 
 
-def plot_episode_ion(exp_name, sub_exp_name, train_step):
-    env, model = load_stuff(exp_name, sub_exp_name, train_step)
+def plot_episode_ion(exp_name, sub_exp_name, train_step, env):
+    model = load_agent(exp_name, sub_exp_name, train_step)
     n_obs, n_act = env.obs_dimension, env.act_dimension
     init_func = env.reset
 
@@ -121,9 +142,11 @@ def plot_episode_ion(exp_name, sub_exp_name, train_step):
 
 
 if __name__ == '__main__':
-    experiment_name = 'PPO_100122_020616'
+    experiment_name = 'PPO_NoisyClipRE_100822_203732'
     # experiment_name = 'TRPO_092922_174343'
-    sub_experiment_name = 'seed-123'
-    training_step = 191000
+    sub_experiment_name = 'seed-780'
+    training_step = 290000#'optimal'
 
-    plot_episodes(experiment_name, sub_experiment_name, training_step)
+    env = NoisyClipRE.load_from_dir(experiment_name)
+    # env.action_noise = 0.08
+    plot_episodes(experiment_name, sub_experiment_name, training_step, env, nrows=2, ncols=2)
