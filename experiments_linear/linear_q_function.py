@@ -2,84 +2,83 @@ import os
 import numpy as np
 import pickle as pkl
 
+from utils.training_utils import argmax, QFuncBaseClass
+
 
 class FeatureExtractor:
     def __init__(self, n_obs):
         self.n_obs = n_obs
-        self.n_features = None
+        self._n_features = None
 
-    def get_features(self, state):
+    def _get_feature(self, state):
         return state
 
-    def get_n_features(self):
-        if self.n_features is None:
-            self.n_features = len(self.get_features(np.zeros(self.n_obs)))
-        return self.n_features
+    @property
+    def n_features(self):
+        if self._n_features is None:
+            self._n_features = len(self._get_feature(np.zeros(self.n_obs)))
+        return self._n_features
 
     def __call__(self, state, **kwargs):
-        return self.get_features(state)
+        return self._get_feature(state)
 
 
-class QValueFunctionLinear:
-    def __init__(self, feature_fn: FeatureExtractor, n_actions: int):
+class QValueFunctionLinear(QFuncBaseClass):
+    def __init__(self, feature_fn: FeatureExtractor, actions: list):
         """
-        param tilings: Tiling instance
-        param actions: List of all possible discrete actions
+        param feature_fn: FeatureExtractor instance which converts continuous state to features
+        param actions: List of all possible actions
         param lr: Generator that yields learning rate
         """
+        super(QValueFunctionLinear, self).__init__()
         self.feature_fn = feature_fn
-        self.n_features = feature_fn.get_n_features()
-        self.n_actions = n_actions
+        self.n_features = feature_fn.n_features
 
-        self.w = np.zeros(self.n_features + n_actions)
+        self.actions = actions
+        self.n_discrete_actions = len(actions)
+        self.n_act = len(actions[0])
+
+        self.w = np.zeros(self.n_features + self.n_act)
 
         self.nb_updates = 0
 
     def get_full_input(self, state, action):
-        state_feature = self.feature_fn.get_features(state)
+        state_feature = self.feature_fn(state)
         state_action = np.concatenate([state_feature, action])
         return state_action
 
-    def value(self, state, action):
-        return self.w.dot(self.get_full_input(state, action))
+    def value(self, state, action_idx):
+        return self.w.dot(self.get_full_input(state, self.actions[action_idx]))
 
-    def update(self, state, action, target, lr):
+    def update(self, state, action_idx, target, lr):
         self.nb_updates += 1
 
-        state_action = self.get_full_input(state, action)
-        error = (target - self.value(state, action)) * state_action
+        state_action = self.get_full_input(state, self.actions[action_idx])
+        error = (target - self.value(state, action_idx)) * state_action
 
         self.w += lr * error
 
         return np.mean(error)
 
-    def greedy_action(self, state, verbose=False):
-        if verbose: print(self.nb_updates)
-        vals = [self.value(state, a_) for a_ in range(self.n_actions)]
-        action_idx = argmax(vals)
-        return action_idx
-
-    def count(self):
-        return self.tilings.count()
-
-
     def save(self, save_path):
-        with open(save_path, 'wb') as  f:
+        with open(save_path, 'wb') as f:
             pkl.dump(dict(
-                q_table=self.q_table[:self.count()],
-                tilings=self.tilings,
-                n_discrete_actions=self.n_actions), f)
+                feature_fn=self.feature_fn,
+                actions=self.actions,
+                w=self.w,
+                nb_updates=self.nb_updates
+            ), f)
 
     @staticmethod
     def load(load_path):
         if os.path.exists(load_path):
             with open(load_path, 'rb') as f:
                 d = pkl.load(f)
-                tilings = d['tilings']
-                n_discrete_actions = d['n_discrete_actions']
-                self = QValueFunctionTiles3(tilings, n_discrete_actions)
-                self.q_table[:tilings.count()] = d['q_table']
+                feature_fn = d['feature_fn']
+                actions = d['actions']
+                self = QValueFunctionLinear(feature_fn, actions)
+                self.w = d['w']
+                self.nb_updates = d['nb_updates']
                 return self
-
         else:
             raise FileNotFoundError(f'Path passed: {load_path}, does not exist.')

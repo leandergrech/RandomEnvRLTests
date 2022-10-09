@@ -3,7 +3,7 @@ import warnings
 warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 
 from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
-from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
+from linear_q_function import QValueFunctionLinear, FeatureExtractor
 from utils.eval_utils import eval_agent
 
 from tqdm import trange
@@ -31,16 +31,12 @@ def train_instance(**kwargs):
         env.save_dynamics(env_save_path)
 
     actions = get_discrete_actions(n_act, 3)
-    n_actions = len(actions)
-    env_ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
 
     '''
     VALUE ESTIMATION
     '''
-    nb_tilings = kwargs.get('nb_tilings')
-    nb_bins = kwargs.get('nb_bins')
-    tilings = Tilings(nb_tilings, nb_bins, env_ranges, 2**20)
-    q = QValueFunctionTiles3(tilings, n_actions)
+    feature_fn = FeatureExtractor(n_obs=n_obs)
+    q = QValueFunctionLinear(feature_fn, actions)
 
     '''
     TRAINING PARAMETERS
@@ -54,23 +50,15 @@ def train_instance(**kwargs):
 
     policy = kwargs.get('policy')
 
-    # def policy(t, obs, q):
-    #     if np.random.rand() < exp_fun(t):
-    #         act = np.random.choice(n_actions)
-    #     else:
-    #         act = q.greedy_action(obs)
-    #     return act
-
     '''
     TRAINING LOOP
     '''
     all_ep_lens = []
     all_returns = []
     all_regrets = []
-    iht_counts = []
 
-    init_state_func = kwargs.get('init_state_func')
-    objective_func = kwargs.get('objective_func')
+    init_state_func = env.reset
+    objective_func = env.objective
     o = env.reset(init_state_func())
     a = q.greedy_action(o)
 
@@ -101,7 +89,6 @@ def train_instance(**kwargs):
             all_ep_lens.append(ret['ep_lens'])
             all_returns.append(ret['returns'])
             all_regrets.append(ret['regrets'])
-            iht_counts.append(tilings.count())
 
         if (T + 1) % kwargs['save_every'] == 0 or T == 0:
             save_dir = kwargs.get('results_path')
@@ -112,7 +99,7 @@ def train_instance(**kwargs):
             save_path = os.path.join(save_dir, f'q_step_{T}.pkl')
             q.save(save_path)
 
-    return dict(iht_counts=iht_counts, ep_lens=all_ep_lens, returns=all_returns, regrets=all_regrets)
+    return dict(ep_lens=all_ep_lens, returns=all_returns, regrets=all_regrets)
 
 
 
