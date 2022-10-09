@@ -216,6 +216,6 @@ if __name__ == '__main__':
     # exp_pardir = 'sarsa_100922_025408_0'
     exp_pardir = 'sarsa_100922_032753_0'
     exp_subdir = 'default'
-    plot_all_experiments_training_stats('.', ['default'], ['Linear RL'], exp_filter='0254')
+    # plot_all_experiments_training_stats('.', ['default'], ['Linear RL'], exp_filter='0254')
     # plot_episodes(exp_pardir, exp_subdir, 3439, 2, 4)
-    # plot_weight_evolution(exp_pardir, exp_subdir)
+    plot_weight_evolution(exp_pardir, exp_subdir)
