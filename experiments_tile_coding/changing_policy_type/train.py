@@ -5,11 +5,9 @@ import yaml
 import pickle as pkl
 from multiprocessing import Pool
 
-from utils.training_utils import Constant, LinearDecay
+from utils.training_utils import Constant, LinearDecay, eps_greedy, boltzmann
 from experiments_tile_coding.sarsa import train_instance as sarsa_train; algo_name = 'sarsa'
 from random_env.envs.random_env_discrete_actions import REDAClip, get_discrete_actions
-from experiments_tile_coding.policy_types import eps_greedy, boltzmann
-
 
 
 def run_experiment(exp_name):

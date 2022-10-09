@@ -1,6 +1,7 @@
 import os
 import pickle as pkl
 from tile_coding_re.tiles3 import IHT, tiles, tilesclip
+from utils.training_utils import argmax, QFuncBaseClass
 
 """
 Workhorse classes used in training tabular RL algorithms on REDA-type environments 
@@ -39,11 +40,7 @@ class Tilings:
         return self.tiles(scaled_features, ints)
 
 
-def argmax(arr):
-    return max((x, i) for i, x in enumerate(arr))[1]
-
-
-class QValueFunctionTiles3:
+class QValueFunctionTiles3(QFuncBaseClass):
     def __init__(self, tilings: Tilings, n_discrete_actions):#, lr: Generator[float, None, None]):
         """
         param tilings: Tiling instance
@@ -59,7 +56,7 @@ class QValueFunctionTiles3:
 
         self.nb_updates = 0
 
-    def value(self, state, action_idx=0):
+    def value(self, state, action_idx):
         codings = self.tilings.get_tiling_indices(features=state,
                                                   ints=[action_idx])
         estimate = 0.
@@ -94,7 +91,6 @@ class QValueFunctionTiles3:
 
     def count(self):
         return self.tilings.count()
-
 
     def save(self, save_path):
         with open(save_path, 'wb') as  f:

@@ -1,7 +1,11 @@
+from abc import ABC
 import numpy as np
 import yaml
 from random_env.envs.random_env_discrete_actions import get_discrete_actions
 
+
+def argmax(arr):
+    return max((x, i) for i, x in enumerate(arr))[1]
 
 def init_label(label):
     if label:
@@ -304,4 +308,39 @@ class TrajBuffer:
         return self.g_
 
 
+class QFuncBaseClass(ABC):
+    def __init__(self, *args, **kwargs):
+        self.n_discrete_actions = None
 
+    def value(self, state, action_idx: int):
+        raise NotImplementedError
+
+    def update(self, state, action_idx, target, lr):
+        raise NotImplementedError
+
+    def greedy_action(self, state):
+        return argmax([self.value(state, a_) for a_ in range(self.n_discrete_actions)])
+
+    def save(self, save_path):
+        raise NotImplementedError
+
+    @staticmethod
+    def load(load_path):
+        raise NotImplementedError
+
+
+def eps_greedy(state: np.ndarray, qfunc: QFuncBaseClass, epsilon: float) -> int:
+    nb_actions = qfunc.n_discrete_actions
+    if np.random.rand() < epsilon:
+        return np.random.choice(nb_actions)
+    else:
+        return qfunc.greedy_action(state)
+
+
+def boltzmann(state: np.ndarray, qfunc: QFuncBaseClass, tau: float) -> int:
+    nb_actions = qfunc.n_discrete_actions
+    qvals_exp = np.exp([qfunc.value(state, a_) / tau for a_ in range(nb_actions)])
+    qvals_exp_sum = np.sum(qvals_exp)
+
+    cum_probas = np.cumsum(qvals_exp / qvals_exp_sum)
+    return np.searchsorted(cum_probas, np.random.rand())
