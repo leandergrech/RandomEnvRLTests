@@ -126,9 +126,9 @@ if not os.path.exists(experiment_name):
 env.save_dynamics(experiment_name)  # Save copy of environment in the experiment for safe-keeping
 
 
-nb_steps = int(3e5)
+nb_steps = int(5e5)
 
-for random_seed in np.random.choice(1000, 1):#(123, 234, 345, 456, 567, 678, 789, 890, 901, 12):
+for random_seed in np.random.choice(1000, 3):#(123, 234, 345, 456, 567, 678, 789, 890, 901, 12):
     random_seed = int(random_seed)
     model_name = f"seed-{random_seed}"
 
@@ -153,7 +153,7 @@ for random_seed in np.random.choice(1000, 1):#(123, 234, 345, 456, 567, 678, 789
         # use_sde=True,
         # sde_sample_freq=100,
         policy_kwargs={
-            'net_arch': [{'pi': [10, 10]},
+            'net_arch': [{'pi': [50, 50]},
                          {'vf': [50, 10]}]},
         verbose=2,
         seed=random_seed,

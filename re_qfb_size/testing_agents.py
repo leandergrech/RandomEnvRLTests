@@ -94,7 +94,7 @@ def plot_episodes(exp_name, sub_exp_name, train_step, env, nrows=2, ncols=4):
                  f'At step:     {train_step}')
     fig.tight_layout()
     fig.savefig(os.path.join(exp_name, f'{sub_exp_name}_{train_step}_step.png'))
-    plt.show()
+    # plt.show()
 
 
 def plot_episode_ion(exp_name, sub_exp_name, train_step, env):
@@ -142,10 +142,10 @@ def plot_episode_ion(exp_name, sub_exp_name, train_step, env):
 
 
 if __name__ == '__main__':
-    experiment_name = 'PPO_NoisyClipRE_100822_203732'
+    experiment_name = 'PPO_NoisyClipRE_100822_221745'
     # experiment_name = 'TRPO_092922_174343'
-    sub_experiment_name = 'seed-780'
-    training_step = 290000#'optimal'
+    sub_experiment_name = 'seed-211'
+    training_step = 500000#'optimal'
 
     env = NoisyClipRE.load_from_dir(experiment_name)
     # env.action_noise = 0.08
