@@ -1,10 +1,23 @@
 import matplotlib.pyplot as plt
 from numpy import nanmin as npmin, nanmax as npmax, array
 
-def y_grid_on(ax):
+from matplotlib.ticker import MultipleLocator
+
+
+def grid_on(ax, axis='y', major_loc=100, minor_loc=20, major_grid=True, minor_grid=True):
+    if axis == 'y':
+        axis_ = ax.yaxis
+    else:
+        axis_ = ax.xaxis
+
+    axis_.set_major_locator(MultipleLocator(major_loc))
+    axis_.set_minor_locator(MultipleLocator(minor_loc))
     ax.minorticks_on()
-    ax.grid(visible=True, which='major', axis='y')
-    ax.yaxis.grid(visible=True, which='minor', c='gray', ls='--', alpha=0.5)
+    if major_grid:
+        ax.grid(which='major', c='gray', axis=axis)
+    if minor_grid:
+        ax.grid(which='minor', c='gray', ls='--', alpha=0.5, axis=axis)
+
 
 def get_min_and_max(xrange):
     return npmin(xrange), npmax(xrange)

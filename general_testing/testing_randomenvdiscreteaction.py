@@ -255,11 +255,12 @@ def testing_reda_optimal_policy_2d():
 
 
 def testing_reda_optimal_policy_bars():
-    from random_env.envs import RandomEnv
-    n_obs, n_act = 15, 15
-    # env = REDA(n_obs, n_act)
-    env = RandomEnv(n_obs, n_act)
-    env.load_dynamics('../common_envs')
+    # from random_env.envs import RandomEnv
+    from random_env.envs import IREDA
+    n_obs, n_act = 10,10
+    # env = RandomEnv(n_obs, n_act)
+    # env.load_dynamics('../common_envs')
+    env = IREDA(n_obs, n_act)
 
     # init_func = env.reset
     init_func = InitSolvableState(env)
@@ -272,8 +273,8 @@ def testing_reda_optimal_policy_bars():
     axs[0].axhline(-env.GOAL, color='g', ls='--')
     axs[0].axhline(env.GOAL, color='g', ls='--')
     act_bars = axs[1].bar(range(n_act), np.zeros(n_act), facecolor='r')
-    for ax in axs:
-        ax.set_ylim((-1, 1))
+    axs[0].set_ylim((-1, 1))
+    axs[1].set_ylim((-0.15, 0.15))
     plt.ion()
     plt.pause(1)
 
@@ -281,18 +282,18 @@ def testing_reda_optimal_policy_bars():
     step = 0
     while not d:
         a = env.get_optimal_action(o)
-        a /= np.max([1, np.max(np.abs(a))])
-        a *= 0.3
+        # a /= np.max([1, np.max(np.abs(a))])
+        # a *= 0.3
         otp1, _, d, _ = env.step(a)
 
         o = otp1
         step += 1
 
         fig.suptitle(step)
-        for bars, data in zip((obs_bars, act_bars), (o, a)):
+        for bars, data in zip((obs_bars, act_bars), (o, np.subtract(a, 1)*env.ACTION_EPS)):
             for bar, datum in zip(bars, data):
                 bar.set_height(datum)
-        plt.pause(1)
+        plt.pause(.3)
     plt.ioff()
 
     fig.suptitle(f'{repr(env)}\n'

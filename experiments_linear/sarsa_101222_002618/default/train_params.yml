@@ -1,0 +1,17 @@
+env_save_path: sarsa_101222_002618/default
+eval_eps: 10
+eval_every: 10
+exp_fun: !LinearDecay
+  decay_steps: 800
+  final: 0.01
+  init: 1.0
+  label: TAU_
+gamma: 0.9
+lr_fun: !Constant
+  label: LR_
+  val: 0.1
+n_act: 2
+n_obs: 2
+nb_training_steps: 1000
+results_path: sarsa_101222_002618/default
+save_every: 10

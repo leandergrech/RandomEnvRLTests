@@ -8,20 +8,23 @@ from multiprocessing import Pool
 
 from utils.training_utils import Constant, LinearDecay, boltzmann
 from experiments_linear.sarsa import train_instance; algo_name = 'sarsa'
-from random_env.envs import REDAClip
+from random_env.envs import REDAClip, IREDA, RandomEnvDiscreteActions as REDA
 
 
 def run_experiment(exp_name):
     n_obs, n_act = 2, 2
-    state_clip = 1.0
-    env = REDAClip(n_obs, n_act, state_clip)
+    # state_clip = 1.0
+    # env = REDAClip(n_obs, n_act, state_clip)
+    env = REDA(n_obs, n_act)
+    # env = IREDA(n_obs, n_act)
 
-    nb_training_steps = 5000
+    nb_training_steps = 1000
     eval_every = 10
     save_every = 10
-    explore_until = 10000
-    exp_fun = LinearDecay(1.0, 0.0, explore_until, label='TAU')
-    lr_fun = Constant(1e-2, label='LR')
+    explore_until = 800
+    exp_fun = LinearDecay(1.0, 1e-2, explore_until, label='TAU')
+    # lr_fun = Constant(1e-1, label='LR')
+    lr_fun = LinearDecay(1e-1, 1e-2, 1000, label='LR')
     gamma = 0.9
 
     sub_experiment_names = ['default']
@@ -39,7 +42,7 @@ def run_experiment(exp_name):
             exp_fun=exp_fun,
             nb_training_steps=nb_training_steps,
             eval_every=eval_every,
-            eval_eps=100,
+            eval_eps=10,
             save_every=save_every,
             gamma=gamma
         )
@@ -59,7 +62,7 @@ def run_experiment(exp_name):
 
 if __name__ == '__main__':
     nb_trials = 1
-    with Pool(4) as p:
-        exp_prefix = dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S')
-        p.map(run_experiment, [f'{exp_prefix}_{item}' for item in range(nb_trials)])
-    # run_experiment(dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S'))
+    # with Pool(4) as p:
+    #     exp_prefix = dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S')
+    #     p.map(run_experiment, [f'{exp_prefix}_{item}' for item in range(nb_trials)])
+    run_experiment(dt.now().strftime(f'{algo_name}_%m%d%y_%H%M%S'))

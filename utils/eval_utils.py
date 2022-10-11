@@ -4,10 +4,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from random_env.envs import get_discrete_actions
+from random_env.envs import get_discrete_actions, RandomEnv
+from utils.training_utils import QFuncBaseClass
 
 
-def play_episode(eval_env, q, init_state=None):
+def play_episode(eval_env: RandomEnv, q: QFuncBaseClass, init_state=None):
     actions = get_discrete_actions(eval_env.act_dimension, 3)
     obses = []
     acts = []
@@ -26,7 +27,7 @@ def play_episode(eval_env, q, init_state=None):
     return obses, acts, rews
 
 
-def eval_agent(eval_env, q, nb_eps, init_func=None):
+def eval_agent(eval_env: RandomEnv, q: QFuncBaseClass, nb_eps: int, init_func=None):
     if init_func is None:
         init_func = eval_env.reset
 
@@ -123,7 +124,7 @@ def get_q_func_step(fn):
         instance at a specified training step. Training step X obtained from filename fn
         in the form q_step_X.pkl.
     """
-    return int(os.path.split(fn)[-1].split('_')[2].split('.')[0])
+    return int(os.path.splitext(fn)[0].split('_')[-1])
 
 
 def get_q_func_filenames(experiment_dir):
@@ -147,7 +148,7 @@ def get_q_func_xrange(q_func_filenames):
     return np.linspace(get_q_func_step(q_func_filenames[0]), get_q_func_step(q_func_filenames[-1]), len(q_func_filenames))
 
 
-def get_val(qvf, state, nb_actions):
+def get_val(qvf: QFuncBaseClass, state, nb_actions):
     """
         Value is defined as the expected return given a state. QValueFunctionTiles3
         only gives us Q-values. I'm assuming the value is the average of all q-values

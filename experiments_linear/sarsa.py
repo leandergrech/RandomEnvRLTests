@@ -22,8 +22,8 @@ def train_instance(**kwargs):
     n_act = kwargs.get('n_act')
 
     env = kwargs.get('env', None)
-    if env is None:
-        env = REDA(n_obs, n_act)
+    # if env is None:
+    #     env = REDA(n_obs, n_act)
 
     eval_env = REDA(n_obs, n_act, model_info=env.model_info)
     env_save_path = kwargs.get('env_save_path', None)
@@ -35,7 +35,7 @@ def train_instance(**kwargs):
     '''
     VALUE ESTIMATION
     '''
-    feature_fn = FeatureExtractor(n_obs=n_obs)
+    feature_fn = FeatureExtractor(env)
     q = QValueFunctionLinear(feature_fn, actions)
 
     '''
@@ -96,7 +96,7 @@ def train_instance(**kwargs):
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
 
-            save_path = os.path.join(save_dir, f'q_step_{T}.pkl')
+            save_path = os.path.join(save_dir, f'q_step_{T+1}.pkl')
             q.save(save_path)
 
     return dict(ep_lens=all_ep_lens, returns=all_returns, regrets=all_regrets)

@@ -111,6 +111,17 @@ class RandomEnvDiscreteActions(RandomEnv, yaml.YAMLObject):
         return env
 
 
+class IREDA(RandomEnvDiscreteActions):
+    def __init__(self, n_obs, n_act, **kwargs):
+        assert n_obs == n_act, f"For now, restricted to n_obs==n_act. n_obs={n_obs}, n_act={n_act} not valid"
+        super(IREDA, self).__init__(n_obs, n_act, **kwargs)
+        self.rm = np.diag(np.ones(n_obs))
+        self.pi = np.diag(np.ones(n_obs))
+
+    def __repr__(self):
+        return f'IREDA_{self.obs_dimension}obsx{self.act_dimension}act'
+
+
 class REDAClip(RandomEnvDiscreteActions):
     yaml_tag = '!REDAClip'
     def __init__(self, n_obs, n_act, state_clip=0.0, **kwargs):
@@ -166,11 +177,6 @@ class REDAClip(RandomEnvDiscreteActions):
         env.pi = np.array(d['pi'])
         env.trim_stats = d['trim_stats']
         return env
-
-
-# for env_type in (RandomEnvDiscreteActions, REDAClip):
-#     yaml.add_representer(env_type, env_type.to_yaml)
-#     yaml.add_constructor(env_type.yaml_tag, env_type.from_yaml)
 
 
 class REDAX(RandomEnvDiscreteActions):
