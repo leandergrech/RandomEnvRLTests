@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from collections import defaultdict
 from tqdm import trange
-from random_env.envs import RandomEnvDiscreteActions as REDA, VREDA, get_discrete_actions, REDAClip
+from random_env.envs import RandomEnvDiscreteActions as REDA, VREDA, get_discrete_actions, REDAClip, REDAClipCont
 from utils.training_utils import InitSolvableState
 import yaml
 
@@ -318,11 +318,17 @@ def testing_redaclip_yaml():
     print('After save')
     print(loaded_env.rm, loaded_env.pi, loaded_env.trim_stats)
 
+def why_get_slower_during_training():
+    env = REDAClipCont(7, 7, 1.0)
+    env.reset()
+    for T in trange(500000):
+        env.step(env.action_space.sample())
 
 if __name__ == '__main__':
     # testing_vreda_velocities()
     # testing_vreda_eplens()
     # vreda_diagnostic_plots()
     # testing_reda_trims()
-    testing_reda_optimal_policy_bars()
+    # testing_reda_optimal_policy_bars()
     # testing_redaclip_yaml()
+    why_get_slower_during_training()

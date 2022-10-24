@@ -15,6 +15,13 @@ def get_discrete_actions(n_act, act_dim=3):
     return all_actions
 
 
+def get_reduced_discrete_actions(n_act, act_dim=3):
+    all_actions = np.vstack([np.zeros(n_act),
+                      np.diag(-np.ones(n_act)),
+                      np.diag(np.ones(n_act))]).astype(int) + 1
+    return all_actions.tolist()
+
+
 class RandomEnvDiscreteActions(RandomEnv, yaml.YAMLObject):
     """
     Model dynamics creation follows that of RandomEnv exactly.
@@ -25,6 +32,7 @@ class RandomEnvDiscreteActions(RandomEnv, yaml.YAMLObject):
     The action is reset to zero vector at the start of every episode
     """
     ACTION_EPS = 0.05
+    # ACTION_EPS = 0.1
     AVAIL_MOM = [-ACTION_EPS, 0., ACTION_EPS]
     yaml_tag = "!REDA"
 
@@ -122,6 +130,14 @@ class IREDA(RandomEnvDiscreteActions):
         return f'IREDA_{self.obs_dimension}obsx{self.act_dimension}act'
 
 
+class REDACont(RandomEnvDiscreteActions):
+    def _is_done(self):
+        return False, False
+
+    def __repr__(self):
+        return f'REDACont_{self.obs_dimension}obsx{self.act_dimension}act'
+
+
 class REDAClip(RandomEnvDiscreteActions):
     yaml_tag = '!REDAClip'
     def __init__(self, n_obs, n_act, state_clip=0.0, **kwargs):
@@ -129,16 +145,17 @@ class REDAClip(RandomEnvDiscreteActions):
         self.state_clip = state_clip
 
     def step(self, action):
+        o_old = self.current_state.copy()
+
         otp1, r, d, info = super(REDAClip, self).step(action)
 
         R = np.sqrt(np.mean(np.square(otp1)))
-        # if any(np.where(otp1<self.state_clip_range[0], True, False)) or \
-        #     any(np.where(otp1>self.state_clip_range[1], True, False)):
-        if R > self.state_clip and self.state_clip > 0.0:
-            d = True
-            info['success'] = False
-            # self.current_state = np.clip(otp1, *self.state_clip_range)
-            self.current_state = otp1 * (self.state_clip / R)
+        if R > self.state_clip > 0.0:
+            # d = True
+            # info['success'] = False
+            # self.current_state = np.clip(otp1, -self.state_clip, self.state_clip)
+            self.current_state = o_old
+            self.reward = r = -10.0
 
         return self.current_state, r, d, info
 
@@ -177,6 +194,16 @@ class REDAClip(RandomEnvDiscreteActions):
         env.pi = np.array(d['pi'])
         env.trim_stats = d['trim_stats']
         return env
+
+
+class REDAClipCont(REDAClip):
+    yaml_tag = '!REDAClipCont'
+    def _is_done(self):
+        _, info = super(REDAClipCont, self)._is_done()
+        return info, info
+
+    def __repr__(self):
+        return f'REDAClipCont_{self.state_clip}clip_{self.obs_dimension}obsx{self.act_dimension}act'
 
 
 class REDAX(RandomEnvDiscreteActions):

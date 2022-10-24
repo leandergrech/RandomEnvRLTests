@@ -27,23 +27,26 @@ def play_episode(eval_env: RandomEnv, q: QFuncBaseClass, init_state=None):
     return obses, acts, rews
 
 
-def eval_agent(eval_env: RandomEnv, q: QFuncBaseClass, nb_eps: int, init_func=None):
+def eval_agent(eval_env: RandomEnv, q: QFuncBaseClass, nb_eps: int, init_func=None, get_obses=False):
+    if get_obses:
+        init_obses = np.empty(shape=(0, eval_env.obs_dimension))
+        terminal_obses = np.empty(shape=(0, eval_env.obs_dimension))
+
     if init_func is None:
         init_func = eval_env.reset
 
     opt_env = deepcopy(eval_env)
 
-    init_obses = np.empty(shape=(0, eval_env.obs_dimension))
-    terminal_obses = np.empty(shape=(0, eval_env.obs_dimension))
-    regrets = []
-    ep_lens = []
-    returns = []
+    regrets = np.zeros(nb_eps)
+    ep_lens = np.zeros(nb_eps)
+    returns = np.zeros(nb_eps)
 
-    actions = get_discrete_actions(eval_env.act_dimension, 3)
-    for _ in range(nb_eps):
+    actions = q.actions
+    for ep in range(nb_eps):
         o = eval_env.reset(init_func())
+        if get_obses:
+            init_obses = np.vstack([init_obses, o. copy()])
         d = False
-        init_obses = np.vstack([init_obses, o. copy()])
         t = 0
         g = 0
         regret = 0
@@ -59,14 +62,16 @@ def eval_agent(eval_env: RandomEnv, q: QFuncBaseClass, nb_eps: int, init_func=No
             g += r
             o = otp1
             t += 1
-        terminal_obses = np.vstack([terminal_obses, o])
-        ep_lens.append(t)
-        returns.append(g)
-        regrets.append(regret)
-
-    obses = dict(initial=init_obses, terminal=terminal_obses)
-
-    return dict(obses=obses, returns=returns, ep_lens=ep_lens, regrets=regrets)
+        if get_obses:
+            terminal_obses = np.vstack([terminal_obses, o])
+        ep_lens[ep] = t
+        returns[ep] = g
+        regrets[ep] = regret
+    if get_obses:
+        obses = dict(initial=init_obses, terminal=terminal_obses)
+        return dict(obses=obses, returns=returns, ep_lens=ep_lens, regrets=regrets)
+    else:
+        return dict(returns=returns, ep_lens=ep_lens, regrets=regrets)
 
 
 def make_state_violins(init_obses, terminal_obses, path):
@@ -87,14 +92,14 @@ def make_state_violins(init_obses, terminal_obses, path):
     plt.close(fig)
 
 
-def get_latest_experiment(lab_dir, pattern='sarsa'):
+def get_latest_experiment(lab_dir, pattern='sarsa', offset=0):
     experiments = []
     for fn in os.listdir(lab_dir):
         if pattern in fn:
             experiments.append(fn)
     experiments = sorted(experiments)
 
-    experiment_name = experiments[-1]
+    experiment_name = experiments[-1-offset]
 
     return os.path.join(lab_dir, experiment_name)
 
@@ -145,7 +150,8 @@ def get_q_func_xrange(q_func_filenames):
         Given a sorted list of q-table files stored during an experiment, return
         the xrange to be used for the plotting x-axis.
     """
-    return np.linspace(get_q_func_step(q_func_filenames[0]), get_q_func_step(q_func_filenames[-1]), len(q_func_filenames))
+    return [int(os.path.splitext(item)[0].split('_')[-1]) for item in q_func_filenames]
+    # return np.linspace(get_q_func_step(q_func_filenames[0]), get_q_func_step(q_func_filenames[-1]), len(q_func_filenames))
 
 
 def get_val(qvf: QFuncBaseClass, state, nb_actions):
@@ -154,7 +160,7 @@ def get_val(qvf: QFuncBaseClass, state, nb_actions):
         only gives us Q-values. I'm assuming the value is the average of all q-values
         obtained from all possible actions.
     """
-    return np.mean([qvf.value(state, a_) for a_ in range(nb_actions)])
+    return np.max([qvf.value(state, a_) for a_ in range(nb_actions)])
 
 
 if __name__ == '__main__':

@@ -14,7 +14,7 @@ __pycache__\
 !tile_coding_re/indirect_approach/q_table_size_heatmaps
 *.npy
 *.npz
-*REDA*
+#*REDA*
 *.ipynb_checkpoints*
 #*.pkl
 #*.yml

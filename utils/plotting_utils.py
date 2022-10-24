@@ -4,14 +4,16 @@ from numpy import nanmin as npmin, nanmax as npmax, array
 from matplotlib.ticker import MultipleLocator
 
 
-def grid_on(ax, axis='y', major_loc=100, minor_loc=20, major_grid=True, minor_grid=True):
+def grid_on(ax, axis='y', major_loc=None, minor_loc=None, major_grid=True, minor_grid=True):
     if axis == 'y':
         axis_ = ax.yaxis
     else:
         axis_ = ax.xaxis
 
-    axis_.set_major_locator(MultipleLocator(major_loc))
-    axis_.set_minor_locator(MultipleLocator(minor_loc))
+    if major_loc is not None:
+        axis_.set_major_locator(MultipleLocator(major_loc))
+    if minor_loc is not None:
+        axis_.set_minor_locator(MultipleLocator(minor_loc))
     ax.minorticks_on()
     if major_grid:
         ax.grid(which='major', c='gray', axis=axis)

@@ -1,4 +1,5 @@
 import os
+from _ast import expr
 from itertools import product
 from collections import defaultdict
 import numpy as np
@@ -7,35 +8,60 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pickle as pkl
 from tqdm import tqdm as pbar
-import re
+from tqdm import tqdm
+import yaml
 
 from utils.plotting_utils import make_heatmap, grid_on
-from linear_q_function import QValueFunctionLinear
-from random_env.envs import REDAClip, IREDA, get_discrete_actions, RandomEnvDiscreteActions as REDA
-from utils.eval_utils import get_q_func_filenames, get_q_func_xrange, get_val, get_q_func_step, get_latest_experiment
+from linear_q_function import QValueFunctionLinear#, QValueFunctionLinearEfficient
+from random_env.envs import REDAClip, IREDA, get_discrete_actions, RandomEnvDiscreteActions as REDA, REDACont, REDAClipCont
+from utils.eval_utils import get_q_func_filenames, get_q_func_xrange, get_val, get_q_func_step, get_latest_experiment, eval_agent
 from utils.training_utils import nball_uniform_sample
 
 
-def get_eval_every_hack(yaml_path):
-    with open(yaml_path, 'r') as f:
-        for line in f:
-            if 'eval_every' in line:
-                return int(re.findall(r'\d+', line)[0])
+def get_training_params(yaml_path):
+    f = open(yaml_path, 'r')
+    d = yaml.load(f, yaml.Loader)
+    f.close()
+    return d
+
 
 
 SUB_EXP_COLORS = ['r', 'g', 'b', 'k'] # I never exceed 4 sub-experiments
 
 
+def create_training_stats(exp_dir, env, eval_eps=10, qvf_type=QValueFunctionLinear):
+    print(f'Creating training_stats.pkl for {exp_dir}')
+    qfns = get_q_func_filenames(exp_dir)
+
+    rets = defaultdict(list)
+    for qfn in tqdm(qfns):
+        q = qvf_type.load(qfn)
+        ret = eval_agent(env, q, eval_eps)
+        for k, v in ret.items():
+            rets[k].append(v)
+    for k in rets.keys():
+        rets[k] = np.array(rets[k])
+    with open(os.path.join(exp_dir, 'training_stats.pkl'), 'wb') as f:
+        pkl.dump(rets, f)
+
+
 def plot_experiment_training_stats(exp_dir, exp_label):
     """
     Access training_stats.pkl for a single experiment and plot training stats.
-    Top plot:    IHT count evolution
-    Middle plot: Episode length mean+std obtained using latest q-table greedily
-    Bottom plot: Return mean obtained using latest q-table greedily
+    Top plot:    Episode length mean+std obtained using latest q-table greedily
+    Middle plot: Return mean obtained using latest q-table greedily
+    Bottom plot: Regret mean obtained using latest q-table greedily
     """
     stats_file = os.path.join(exp_dir, 'training_stats.pkl')
+    training_params = get_training_params(os.path.join(exp_dir, 'train_params.yml'))
 
-    eval_every = get_eval_every_hack(os.path.join(exp_dir, 'train_params.yml'))
+    eval_every = training_params['eval_every']
+    lr_fun = training_params['lr_fun']
+    exp_fun = training_params['exp_fun']
+    if 'TAU' in exp_fun.label:
+        exploration_label='Boltzmann temperature'
+    elif 'EPS' in exp_fun.label:
+        exploration_label='Epsilon'
 
     with open(stats_file, 'rb') as f:
         data = pkl.load(f)
@@ -44,14 +70,17 @@ def plot_experiment_training_stats(exp_dir, exp_label):
     returns = data['returns']
     regrets = data['regrets']
 
-    xrange = np.arange(len(ep_lens)) * eval_every
+    # xrange = [int(os.path.splitext(item)[0].split('_')[-1]) for item in get_q_func_filenames(exp_dir)]
+    xrange = get_q_func_xrange(get_q_func_filenames(exp_dir))
+    # xrange = np.arange(len(ep_lens)) * eval_every
+    maxx = max(xrange)
 
     fig, axs = plt.subplots(3, gridspec_kw=dict(height_ratios=[3, 3, 3]), figsize=(15, 10))
 
     ax = axs[0]
     ep_lens_mean = np.mean(ep_lens, axis=1)
     ep_lens_std = np.std(ep_lens, axis=1)
-    ax.plot(xrange, ep_lens_mean, ls='dashed', label=f'{exp_label} Mean')
+    el_line, = ax.plot(xrange, ep_lens_mean, ls='dashed', label=f'{exp_label} Mean')
     ax.set_title('Using greedy policy')
     ax.set_ylabel('Episode length')
     grid_on(ax, 'y', major_loc=20, minor_loc=5, major_grid=True, minor_grid=False)
@@ -59,22 +88,156 @@ def plot_experiment_training_stats(exp_dir, exp_label):
     ax = axs[1]
     returns_mean = np.mean(returns, axis=1)
     returns_std = np.std(returns, axis=1)
-    ax.plot(xrange, returns_mean, ls='dashed', label=f'{exp_label} Mean')
+    ret_line, = ax.plot(xrange, returns_mean, ls='dashed', label=f'{exp_label} Mean')
+    # ax.set_yscale('symlog')
+    # ax.yaxis.set_major_locator(mpl.ticker.LogLocator(10, (np.arange(2, 10, 2))))
+    grid_on(ax, 'y', major_loc=np.ptp(returns_mean)//10, minor_loc=np.ptp(returns_mean)//25, major_grid=True, minor_grid=True)
     ax.set_ylabel('Returns')
 
     ax = axs[2]
     regrets_mean = np.mean(regrets, axis=1)
     regrets_std = np.std(regrets, axis=1)
-    ax.plot(xrange, regrets_mean, ls='dashed', label=f'{exp_label} Mean')
-    ax.set_ylabel('Returns')
+    reg_line, = ax.plot(xrange, regrets_mean, ls='dashed', label=f'{exp_label} Mean')
+    ax.set_ylabel('Regrets')
+
+    data_lines = [el_line, ret_line, reg_line]
+
+    lrs = [lr_fun(x) for x in xrange]
+    exps = [exp_fun(x) for x in xrange]
 
     for ax in axs:
-        ax.legend(loc='best', prop=dict(size=8))
-        grid_on(ax, 'x')
         ax.set_xlabel('Training steps')
+        max_x = max(xrange)
+        xtick_labels = np.arange(0, max_x, max_x // 10)
+        ax.set_xticks(xtick_labels, xtick_labels)
+        ax.legend(loc='best', prop=dict(size=8))
+        grid_on(ax, 'x', major_loc=maxx//10, minor_loc=maxx//50)
+
+        axx1 = ax.twinx()
+        lr_line, = axx1.plot(xrange, lrs, c='g', lw=2       )
+        axx1.set_ylabel('Learning rate')
+        axx1.yaxis.label.set_color(lr_line.get_color())
+        axx1.tick_params(axis='y', colors=lr_line.get_color())
+
+        axx2 = ax.twinx()
+        axx2.spines.right.set_position(("axes", 1.05))
+        exp_line, = axx2.plot(xrange, exps, c='r', ls=':', lw=2)
+        axx2.set_ylabel(exploration_label)
+        axx2.yaxis.label.set_color(exp_line.get_color())
+        axx2.tick_params(axis='y', colors=exp_line.get_color())
 
     fig.tight_layout()
-    plt.savefig(os.path.join(exp_pardir, 'training_stats.png'))
+    save_name = 'training_stats.png'
+    plt.savefig(os.path.join(exp_dir, save_name))
+
+
+def plot_experiment_all_subs_training_stats(exp_dir, exp_label):
+    """
+    Access training_stats.pkl for a single experiment and plot training stats.
+    Top plot:    Episode length mean+std obtained using latest q-table greedily
+    Middle plot: Return mean obtained using latest q-table greedily
+    Bottom plot: Regret mean obtained using latest q-table greedily
+    """
+    sub_exp_paths = []
+    for fn in os.listdir(exp_dir):
+        if '.png' not in fn:
+            sub_exp_paths.append(os.path.join(exp_dir, fn))
+
+    training_params = get_training_params(os.path.join(sub_exp_paths[0], 'train_params.yml'))
+
+    eval_every = training_params['eval_every']
+    lr_fun = training_params['lr_fun']
+    exp_fun = training_params['exp_fun']
+    if 'TAU' in exp_fun.label:
+        exploration_label = 'Boltzmann temperature'
+    elif 'EPS' in exp_fun.label:
+        exploration_label = 'Epsilon'
+
+    ep_lens = []
+    returns = []
+    regrets = []
+
+    env_str = None
+    for sub_exp in sub_exp_paths:
+        if env_str is None:
+            for item in os.listdir(sub_exp):
+                if 'dynamics' in item:
+                    env_str = item.split('_')[:-1]
+        with open(os.path.join(sub_exp, 'training_stats.pkl'), 'rb') as f:
+            data = pkl.load(f)
+            ep_lens.append(data['ep_lens'])
+            returns.append(data['returns'])
+            regrets.append(data['regrets'])
+
+    xrange = (np.arange(len(ep_lens[0])) + 1) * eval_every
+    maxx = max(xrange)
+    print(maxx)
+
+    fig, axs = plt.subplots(3, gridspec_kw=dict(height_ratios=[3, 3, 3]), figsize=(15, 10))
+
+
+    ax = axs[0]
+    ep_lens_mean = np.mean(np.mean(ep_lens, axis=-1), axis=0)
+    ep_lens_med = np.mean(np.median(ep_lens, axis=-1), axis=0)
+    ep_lens_min = np.mean(np.min(ep_lens, axis=-1), axis=0)
+    ep_lens_max = np.mean(np.max(ep_lens, axis=-1), axis=0)
+    ax.fill_between(xrange, ep_lens_min, ep_lens_max, edgecolor='b', facecolor='None', hatch='//', alpha=0.5)
+    el_line, = ax.plot(xrange, ep_lens_mean, ls='solid', label=f'{exp_label} Mean', c='b')
+    el_line, = ax.plot(xrange, ep_lens_med, ls='dashed', label=f'{exp_label} Median', c='b')
+    ax.set_ylabel('Episode length')
+    grid_on(ax, 'y', major_loc=20, minor_loc=5, major_grid=True, minor_grid=False)
+
+    ax = axs[1]
+    returns_mean = np.mean(np.mean(returns, axis=-1), axis=0)
+    returns_med = np.mean(np.median(returns, axis=-1), axis=0)
+    returns_min = np.mean(np.min(returns, axis=-1), axis=0)
+    returns_max = np.mean(np.max(returns, axis=-1), axis=0)
+    ax.fill_between(xrange, returns_min, returns_max, edgecolor='b', facecolor='None', hatch='//', alpha=0.5)
+    ret_line, = ax.plot(xrange, returns_mean, ls='solid', label=f'{exp_label} Mean', c='b')
+    ret_line, = ax.plot(xrange, returns_med, ls='dashed', label=f'{exp_label} Median', c='b')
+    grid_on(ax, 'y', major_loc=10.0, minor_loc=2., major_grid=True, minor_grid=True)
+    ax.set_ylabel('Returns')
+
+    ax = axs[2]
+    regrets_mean = np.mean(np.mean(regrets, axis=-1), axis=0)
+    regrets_med = np.mean(np.median(regrets, axis=-1), axis=0)
+    regrets_min = np.mean(np.min(regrets, axis=-1), axis=0)
+    regrets_max = np.mean(np.max(regrets, axis=-1), axis=0)
+    ax.fill_between(xrange, regrets_min, regrets_max, edgecolor='b', facecolor='None', hatch='//', alpha=0.5)
+    reg_line, = ax.plot(xrange, regrets_mean, ls='solid', label=f'{exp_label} Mean', c='b')
+    reg_line, = ax.plot(xrange, regrets_med, ls='dashed', label=f'{exp_label} Median', c='b')
+    ax.set_ylabel('Regrets')
+
+    data_lines = [el_line, ret_line, reg_line]
+
+    lrs = [lr_fun(x) for x in xrange]
+    exps = [exp_fun(x) for x in xrange]
+
+    for ax in axs:
+        ax.set_xlabel('Training steps')
+        max_x = max(xrange)
+        xtick_labels = np.arange(0, max_x, max_x // 10)
+        ax.set_xticks(xtick_labels, xtick_labels)
+        ax.legend(loc='best', prop=dict(size=8))
+        grid_on(ax, 'x', major_loc=maxx // 10, minor_loc=maxx // 50)
+
+        axx1 = ax.twinx()
+        lr_line, = axx1.plot(xrange, lrs, c='g', lw=2)
+        axx1.set_ylabel('Learning rate')
+        axx1.yaxis.label.set_color(lr_line.get_color())
+        axx1.tick_params(axis='y', colors=lr_line.get_color())
+
+        axx2 = ax.twinx()
+        axx2.spines.right.set_position(("axes", 1.05))
+        exp_line, = axx2.plot(xrange, exps, c='r', ls=':', lw=2)
+        axx2.set_ylabel(exploration_label)
+        axx2.yaxis.label.set_color(exp_line.get_color())
+        axx2.tick_params(axis='y', colors=exp_line.get_color())
+
+    fig.suptitle(f'{len(sub_exp_paths)}x {env_str}')
+    fig.tight_layout()
+    save_name = 'training_stats.png'
+    plt.savefig(os.path.join(exp_dir, save_name))
 
 
 def plot_all_experiments_training_stats(exp_pardir, exp_subdirs, exp_labels, exp_filter=''):
@@ -146,13 +309,17 @@ def plot_all_experiments_training_stats(exp_pardir, exp_subdirs, exp_labels, exp
     plt.show()
 
 
-def plot_episodes(exp_dir: str, train_step: int, env_type: REDA, nrows=2, ncols=4, save_dir=None):
+def plot_episodes(exp_dir, train_step, env, nrows=2, ncols=4, save_dir=None,
+                  qvf_type=QValueFunctionLinear):
     if save_dir is None:
         save_dir = exp_dir
 
-    env = env_type.load_from_dir(exp_dir)
+    # env = env_type.load_from_dir(exp_dir)
+    # if transform_to_env_type is not None:
+    #     env = transform_to_env_type(env.obs_dimension, env.act_dimension, state_clip=env.state_clip, model_info=env.model_info)
     q_func_file = os.path.join(exp_dir, 'q_func', f'q_step_{train_step}.pkl')
-    q = QValueFunctionLinear.load(q_func_file)
+    # q = QValueFunctionLinear.load(q_func_file)
+    q = qvf_type.load(q_func_file)
     n_obs, n_act = env.obs_dimension, env.act_dimension
     init_func = env.reset
 
@@ -193,8 +360,8 @@ def plot_episodes(exp_dir: str, train_step: int, env_type: REDA, nrows=2, ncols=
         ax_act.plot(acts, c='r')
 
         for ax, ylab in zip((ax_obs, ax_act), ('States', 'Actions')):
-            grid_on(ax, 'x', 5, 1, True, False)
-            ax.set_xticks(np.arange(step))
+            grid_on(ax, 'x', 20, 5, True, False)
+            # ax.set_xticks(np.arange(step))
             ax.set_ylabel(ylab, size=12)
 
         ax_obs.get_shared_x_axes().join(ax_obs, ax_act)
@@ -214,6 +381,7 @@ def plot_weight_evolution(exp_dir, save_dir=None):
 
     q_func_fns = get_q_func_filenames(exp_dir)
     x = get_q_func_xrange(q_func_fns)
+    maxx = max(x)
 
     weights = None
     actions = None
@@ -227,13 +395,23 @@ def plot_weight_evolution(exp_dir, save_dir=None):
             weights2 = np.expand_dims(q.w, axis=-1)
             weights = np.concatenate([weights, weights2], axis=-1)
 
-    fig, axs = plt.subplots(3, 3, figsize=(20, 12))
-    axs = np.ravel(axs)
-    for ax, per_action_weights in zip(axs, weights):
-        for i, per_action_w in enumerate(per_action_weights):
-            ax.plot(x, per_action_w, label=f'w_{i}')
+    if len(weights.shape) > 2:
+        fig, axs = plt.subplots(3, 3, figsize=(20, 12))
+        axs = np.ravel(axs)
+    else:
+        fig, ax = plt.subplots(figsize=(20, 12))
+        axs = np.repeat([ax], len(weights))
+
+    for i, (ax, per_action_weights) in enumerate(zip(axs, weights)):
+        if len(per_action_weights.shape) == 2:
+            for j, per_action_w in enumerate(per_action_weights):
+                ax.plot(x, per_action_w, label=f'w_{j}')
+        else:
+            ax.plot(x, per_action_weights, label=f'w_{i}')
     for ax, a in zip(axs, actions):
-        grid_on(ax, 'x', 100, 20)
+        grid_on(ax, 'x', maxx//10, maxx//50)
+        grid_on(ax, 'y', 1, 0.2)
+        ax.axhline(0.0, ls='-.', lw=2, c='k')
         ax.set_title(np.subtract(a, 1), size=18)
         ax.set_xlabel('Training step', size=15)
         ax.set_ylabel('Weight', size=15)
@@ -241,84 +419,79 @@ def plot_weight_evolution(exp_dir, save_dir=None):
 
     fig.tight_layout()
     plt.savefig(os.path.join(save_dir, 'tracked_weights.png'))
-    plt.show()
-    plt.show()
 
 
-def create_grid_tracking_states(env, n_dim):
-    """
-    Utility function to create grid of states for passed env. Each env state
-    dimension is split into n_dim parts. Returns 1D list with n_dim**n_obs
-    total states.
-    """
-    tracking_ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
-    tracking_states = np.array(
-        [list(item) for item in product(*np.array([np.linspace(l, h, n_dim) for l, h in tracking_ranges]))])
+# def create_grid_tracking_states(env, n_dim):
+#     """
+#     Utility function to create grid of states for passed env. Each env state
+#     dimension is split into n_dim parts. Returns 1D list with n_dim**n_obs
+#     total states.
+#     """
+#     tracking_ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
+#     tracking_states = np.array(
+#         [list(item) for item in product(*np.array([np.linspace(l, h, n_dim) for l, h in tracking_ranges]))])
+#
+#     return tracking_states
 
-    return tracking_states
+
+# def plot_q_vals_grid_tracking_states(experiment_dir, n_tracking_dim, env_type, save_dir=None):
+#     """
+#     Create a grid of states within the environment state limits, access the q-table for every eval
+#     step during training, and plot the evolution of the tracked q-values during training.
+#     """
+#     if save_dir is None:
+#         save_dir = experiment_dir
+#
+#     experiment_name = os.path.split(experiment_dir)
+#
+#     env = env_type.load_from_dir(experiment_dir)
+#     actions = get_discrete_actions(env.act_dimension, 3)
+#     nb_actions = len(actions)
+#
+#     q_func_filenames = get_q_func_filenames(experiment_dir)
+#     nb_q_funcs = len(q_func_filenames)
+#     xrange = get_q_func_xrange(q_func_filenames)
+#
+#     # Initialise grid tracking states
+#     tracking_states = create_grid_tracking_states(env, n_tracking_dim)
+#     nb_tracked = len(tracking_states)
+#
+#     vals = np.zeros(shape=(nb_tracked, nb_q_funcs))
+#     for j, qfn in enumerate(q_func_filenames):
+#         q = QValueFunctionLinear.load(qfn)
+#         for i, ts in enumerate(tracking_states):
+#             vals[i, j] = get_val(q, ts, nb_actions)
+#
+#     # Initialise figure
+#     fig, axs = plt.subplots(2, gridspec_kw=dict(height_ratios=[1, 2]))
+#     cmap = mpl.cm.get_cmap('tab10')
+#     cmap_x = np.linspace(0, 1, nb_tracked)
+#
+#     # Plot tracked states
+#     ax = axs[0]
+#     ax.set_xlabel('State dimension 0')
+#     ax.set_ylabel('State dimension 1')
+#     for i, ts in enumerate(tracking_states):
+#         ax.scatter(ts[0], ts[1], marker='x', c=cmap(cmap_x[i]))
+#
+#     # Plot evolution of q_values for tracked states
+#     ax = axs[1]
+#     ax.set_xlabel('Training steps')
+#     ax.set_ylabel('Estimated values')
+#     for i, val in enumerate(vals):
+#         ax.plot(xrange, val, c=cmap(cmap_x[i]), lw=1.0)
+#
+#     fig.suptitle(experiment_name)
+#     fig.tight_layout()
+#     plt.savefig(os.path.join(save_dir, 'tracked_vals.png'))
+#     plt.show()
 
 
-def plot_q_vals_grid_tracking_states(experiment_dir, n_tracking_dim, env_type, save_dir=None):
-    """
-    Create a grid of states within the environment state limits, access the q-table for every eval
-    step during training, and plot the evolution of the tracked q-values during training.
-    """
+def plot_q_vals_region_sampling_tracking_states(experiment_dir, env, save_dir=None):
     if save_dir is None:
         save_dir = experiment_dir
 
-    experiment_name = os.path.split(experiment_dir)
-
-    env = env_type.load_from_dir(experiment_dir)
-    actions = get_discrete_actions(env.act_dimension, 3)
-    nb_actions = len(actions)
-
-    q_func_filenames = get_q_func_filenames(experiment_dir)
-    nb_q_funcs = len(q_func_filenames)
-    xrange = get_q_func_xrange(q_func_filenames)
-
-    # Initialise grid tracking states
-    tracking_states = create_grid_tracking_states(env, n_tracking_dim)
-    nb_tracked = len(tracking_states)
-
-    vals = np.zeros(shape=(nb_tracked, nb_q_funcs))
-    for j, qfn in enumerate(q_func_filenames):
-        q = QValueFunctionLinear.load(qfn)
-        for i, ts in enumerate(tracking_states):
-            vals[i, j] = get_val(q, ts, nb_actions)
-
-    # Initialise figure
-    fig, axs = plt.subplots(2, gridspec_kw=dict(height_ratios=[1, 2]))
-    cmap = mpl.cm.get_cmap('tab10')
-    cmap_x = np.linspace(0, 1, nb_tracked)
-
-    # Plot tracked states
-    ax = axs[0]
-    ax.set_xlabel('State dimension 0')
-    ax.set_ylabel('State dimension 1')
-    for i, ts in enumerate(tracking_states):
-        ax.scatter(ts[0], ts[1], marker='x', c=cmap(cmap_x[i]))
-
-    # Plot evolution of q_values for tracked states
-    ax = axs[1]
-    ax.set_xlabel('Training steps')
-    ax.set_ylabel('Estimated values')
-    for i, val in enumerate(vals):
-        ax.plot(xrange, val, c=cmap(cmap_x[i]), lw=1.0)
-
-    fig.suptitle(experiment_name)
-    fig.tight_layout()
-    plt.savefig(os.path.join(save_dir, 'tracked_vals.png'))
-    plt.show()
-
-
-def plot_q_vals_region_sampling_tracking_states(experiment_dir, env_type, save_dir=None):
-    if save_dir is None:
-        save_dir = experiment_dir
-
-    env = env_type.load_from_dir(experiment_dir)
     n_obs = env.obs_dimension
-    actions = get_discrete_actions(env.act_dimension, 3)
-    nb_actions = len(actions)
 
     # Searching for training data
     q_func_filenames = get_q_func_filenames(experiment_dir)
@@ -339,9 +512,10 @@ def plot_q_vals_region_sampling_tracking_states(experiment_dir, env_type, save_d
     # Estimating values at tracked states
     tracked_vals = [[] for _ in range(nb_tracked)]  # shape=(nb_tracked, len(q_func_filenames))
     for qfn in pbar(q_func_filenames):
+        # q = QValueFunctionLinearEfficient.load(qfn)
         q = QValueFunctionLinear.load(qfn)
         for i, ts in enumerate(tracking_states):
-            tracked_vals[i].append(get_val(q, ts, nb_actions))
+            tracked_vals[i].append(get_val(q, ts, len(q.actions)))
 
     # Plotting
     fig, axs = plt.subplots(2, figsize=(15, 10))
@@ -388,16 +562,33 @@ def plot_q_vals_region_sampling_tracking_states(experiment_dir, env_type, save_d
 
 
 if __name__ == '__main__':
-    # exp_pardir = 'sarsa_101222_002618'
-    exp_pardir = get_latest_experiment('.')
-    exp_subdir = 'default'
+    # exp_pardir = 'ramp_env_size_102322_183706'
+    exp_pardir = 'ramp_env_size_102322_201202'
+    # exp_pardir = get_latest_experiment('.', offset=0)
+    # exp_subdir = '2obsx2act_678seed'
+    n_obs=n_act = 12
+    exp_subdir = f'{n_obs}obsx{n_act}act_678seed'
     print(f'Evaluating experiment: {exp_pardir}\n'
           f'Sub-experiment: {exp_subdir}')
 
     exp_dir = os.path.join(exp_pardir, exp_subdir)
 
-    # plot_episodes(exp_dir=exp_dir, train_step=720, env_type=REDA, save_dir=exp_pardir, nrows=2, ncols=3)
-    plot_experiment_training_stats(exp_dir, 'Linear RL')
-    plot_weight_evolution(exp_dir, save_dir=exp_pardir)
-    # plot_all_experiments_training_stats('.', ['default'], ['Linear RL'], exp_filter='0254')
-    # plot_q_vals_region_sampling_tracking_states(experiment_dir=exp_dir, env_type=IREDA, save_dir=exp_pardir)
+    env = REDAClipCont.load_from_dir(exp_dir)
+    env = REDAClip(n_obs=env.obs_dimension, n_act=env.act_dimension,
+                   state_clip=env.state_clip, model_info=env.model_info)
+    env.EPISODE_LENGTH_LIMIT=300
+
+
+    # for train_step in [1500, 1600, 1700, 1800, 1900]:
+    #     plot_episodes(exp_dir=exp_dir, train_step=train_step, env_type=REDAClipCont, transform_to_env_type=REDAClip,
+    #                   save_dir=exp_pardir, nrows=2, ncols=3)
+
+    # create_training_stats(exp_dir, env=env, eval_eps=5)
+    train_step = 20300
+    plot_episodes(exp_dir=exp_dir, train_step=train_step, env=env,
+                  save_dir=exp_dir, nrows=3, ncols=3)
+
+    # plot_experiment_training_stats(exp_dir, 'Linear RL')
+    # # plot_experiment_all_subs_training_stats(exp_pardir, 'Linear RL')
+    # plot_weight_evolution(exp_dir, save_dir=exp_dir)
+    # plot_q_vals_region_sampling_tracking_states(experiment_dir=exp_dir, env=env)
