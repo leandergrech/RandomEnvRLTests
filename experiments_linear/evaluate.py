@@ -55,7 +55,6 @@ def plot_experiment_training_stats(exp_dir, exp_label):
     stats_file = os.path.join(exp_dir, 'training_stats.pkl')
     training_params = get_training_params(os.path.join(exp_dir, 'train_params.yml'))
 
-    eval_every = training_params['eval_every']
     lr_fun = training_params['lr_fun']
     exp_fun = training_params['exp_fun']
     if 'TAU' in exp_fun.label:
@@ -410,14 +409,14 @@ def plot_weight_evolution(exp_dir, save_dir=None):
             ax.plot(x, per_action_weights, label=f'w_{i}')
     for ax, a in zip(axs, actions):
         grid_on(ax, 'x', maxx//10, maxx//50)
-        grid_on(ax, 'y', 1, 0.2)
+        # grid_on(ax, 'y', 1, 0.2)
         ax.axhline(0.0, ls='-.', lw=2, c='k')
         ax.set_title(np.subtract(a, 1), size=18)
         ax.set_xlabel('Training step', size=15)
         ax.set_ylabel('Weight', size=15)
         ax.legend(loc='best')
 
-    fig.tight_layout()
+    # fig.tight_layout()
     plt.savefig(os.path.join(save_dir, 'tracked_weights.png'))
 
 
@@ -566,8 +565,9 @@ if __name__ == '__main__':
     exp_pardir = 'ramp_env_size_102322_201202'
     # exp_pardir = get_latest_experiment('.', offset=0)
     # exp_subdir = '2obsx2act_678seed'
-    n_obs=n_act = 12
-    exp_subdir = f'{n_obs}obsx{n_act}act_678seed'
+    n_obs=n_act = 25
+    random_seed = 123
+    exp_subdir = f'{n_obs}obsx{n_act}act_{random_seed}seed'
     print(f'Evaluating experiment: {exp_pardir}\n'
           f'Sub-experiment: {exp_subdir}')
 
@@ -583,12 +583,12 @@ if __name__ == '__main__':
     #     plot_episodes(exp_dir=exp_dir, train_step=train_step, env_type=REDAClipCont, transform_to_env_type=REDAClip,
     #                   save_dir=exp_pardir, nrows=2, ncols=3)
 
-    # create_training_stats(exp_dir, env=env, eval_eps=5)
-    train_step = 20300
-    plot_episodes(exp_dir=exp_dir, train_step=train_step, env=env,
-                  save_dir=exp_dir, nrows=3, ncols=3)
+    train_step = 250000
+    plot_episodes(exp_dir=exp_dir, train_step=train_step, env=env, save_dir=exp_dir, nrows=2, ncols=2)
 
+    # create_training_stats(exp_dir, env=env, eval_eps=5)
     # plot_experiment_training_stats(exp_dir, 'Linear RL')
+
     # # plot_experiment_all_subs_training_stats(exp_pardir, 'Linear RL')
     # plot_weight_evolution(exp_dir, save_dir=exp_dir)
     # plot_q_vals_region_sampling_tracking_states(experiment_dir=exp_dir, env=env)

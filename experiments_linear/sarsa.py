@@ -114,6 +114,7 @@ def quick_save(dir, step, q):
     save_path = os.path.join(save_dir, f'q_step_{step + 1}.pkl')
     q.save(save_path)
 
+
 def train_instance_early_termination(**kwargs):
     """
     REDA training function. Kwargs holds all configurable training parameters and is saved to file
@@ -147,6 +148,7 @@ def train_instance_early_termination(**kwargs):
     gamma = kwargs.get('gamma')
     nb_training_steps = kwargs.get('nb_training_steps')
     eval_every = kwargs.get('eval_every')
+    _eval_every = eval_every
     eval_eps = kwargs.get('eval_eps')
     start_eval = kwargs.get('start_eval')
 
@@ -155,6 +157,8 @@ def train_instance_early_termination(**kwargs):
     '''
     TRAINING LOOP
     '''
+    save_path = kwargs.get('save_path')
+
     o = env.reset()
     a = q.greedy_action(o)
 
@@ -175,10 +179,8 @@ def train_instance_early_termination(**kwargs):
         lr = lr_fun(T)
         q.update(o, a, target, lr)
 
-        if info['success']:
-            print(f'Success at step {T}')
-
         if d:
+            print(f'Success at step {T}')
             o = env.reset()
             a = policy(o, q, exploration)
         else:
@@ -186,8 +188,18 @@ def train_instance_early_termination(**kwargs):
             a = a_
 
         if (T + 1) % eval_every == 0 and T >= start_eval:
-            print(f'Evaluating at step {T}')
+            if max(np.ravel(np.abs(q.w))) > 100 or np.isnan(np.sum(q.w)):
+                quick_save(save_path, T, q)
+                q.reset_weights()
+                print(f'\n\nState: {o}\n'
+                      f'LR:  {lr:.2g}\n'
+                      f'EXP: {exploration*100.0:.2f}%'
+                      '\n******* RESET WEIGHTS *******\n\n')
+
+            # print(f'Evaluating at step {T}')
             eval_ep_success = []
+
+            # Run evaluation episodes
             for ep in range(eval_eps):
                 eo = eval_env.reset()
                 ed = False
@@ -196,18 +208,23 @@ def train_instance_early_termination(**kwargs):
                     eotp1, er, ed, info = eval_env.step(actions[ea])
                     eo = eotp1
                 eval_ep_success.append(info['success'])
+
+            # Store mean of eval episode successes
             eval_successes.append(np.mean(eval_ep_success)==1.0)
-            if sum(eval_successes) == 1 and eval_every > 1000:
-                eval_every = 1000
-            elif sum(eval_successes) > 1 and eval_every > 100:
+
+            if sum(eval_successes) > 0 and eval_every > 100:
                 eval_every = 100
+            else:
+                eval_every = _eval_every
 
             if eval_successes[-1]:
                 quick_save(kwargs.get('save_path'), T, q)
+                # break
+            if sum(eval_successes) == nb_successes_early_termination:
                 break
 
         if (T + 1) % kwargs['save_every'] == 0 or T == 0:
-            quick_save(kwargs.get('save_path'), T, q)
+            quick_save(save_path, T, q)
 
     return T
 

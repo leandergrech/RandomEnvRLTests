@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 COMET_API_KEY = 'LvCyhW3NX1yaPPqv3LIMb1qDr'
 COMET_WORKSPACE_NAME = 'testing-ppo-trpo'
 COMET_PROJECT_NAME = 'sess-trpo-050522-131337'
+algo_name = 'TRPO'
 
 api = API(api_key=COMET_API_KEY)
 experiments = api.get(COMET_WORKSPACE_NAME, COMET_PROJECT_NAME)
@@ -57,6 +58,7 @@ sizes = np.arange(min(nb_training_steps_mean_list), max(nb_training_steps_mean_l
 means = [nb_training_steps_mean_list[item] for item in sizes]
 ax.plot(sizes, means, marker='o', color='k', label='Means', zorder=10)
 
+fig.suptitle(f'{algo_name} trained on RandomEnv\nNumber of training steps vs. environment size')
 ax.legend(loc='upper left')
 ax.set_ylabel('Training steps until convergence')
 ax.set_xlabel('Environment size n (n obs x n act)')

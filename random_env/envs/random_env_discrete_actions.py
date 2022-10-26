@@ -155,7 +155,7 @@ class REDAClip(RandomEnvDiscreteActions):
             # info['success'] = False
             # self.current_state = np.clip(otp1, -self.state_clip, self.state_clip)
             self.current_state = o_old
-            self.reward = r = -10.0
+            # self.reward = r = -10.0
 
         return self.current_state, r, d, info
 
