@@ -2,7 +2,7 @@ import os
 import numpy as np
 from datetime import datetime as dt
 from collections import deque
-import comet_ml
+# import comet_ml
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 import torch as t
@@ -11,7 +11,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from sb3_contrib import TRPO
 from random_env.envs import RandomEnv, RunningStats
-from my_agents_utils import make_path_exist, get_writer, count_parameters
+# from my_agents_utils import make_path_exist, get_writer, count_parameters
 
 
 class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
@@ -158,15 +158,10 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
                 print(f'\t-> FPS = {fps:.2f}')
                 print('')
 
-            self.logger.log_metrics({'eval/episode_return': returns,
-                                     'eval/episode_length': ep_lens,
-                                     'eval/success': success,
-                                     'eval/rew_final_neg_init': rew_final_neg_init,
-                                     'eval/expected_rew_per_step': expected_rew_per_step,
-                                     'spaces/obs_mean': obs_mean, 'spaces/obs_std': obs_std,
-                                     'spaces/act_mean': act_mean, 'spaces/act_std': act_std,
-                                     'spaces/trim_mean': trim_mean, 'spaces/trim_std': trim_std,
-                                     'train/fps': fps}, step=self.num_timesteps)
+            for tag, val in zip(('eval/episode_return', 'eval/episode_length', 'eval/success', 'eval/rew_final_neg_init',
+                                 'eval/expected_rew_per_step', 'train/fps'),
+                                (returns, ep_lens, success, rew_final_neg_init, expected_rew_per_step, fps)):
+                self.logger.record(tag, val)
 
             ### SAVE SUCCESSFUL AGENTS ###
             if success > 50.0:
@@ -187,7 +182,7 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
 
 COMET_WORKSPACE = 'testing-ppo-trpo'
 COMMON_ENV_DIR = '../identity_envs'
-algo = 'TRPO'
+algo = 'PPO'
 
 if 'PPO' in algo:
     # '''
@@ -262,14 +257,11 @@ EVAL_FREQ = 1000
 CHKPT_FREQ = 50000
 
 params = DEFAULT_PARAMS.copy()
-session_name = dt.strftime(dt.now(), f'sess_{algo.lower()}_%m%d%y_%H%M%S')
+# session_name = dt.strftime(dt.now(), f'sess_{algo.lower()}_%m%d%y_%H%M%S')
+session_name = 'sess_ppo_102422_150542'
 par_dir = os.path.join('sb3_identityenv_training', session_name)
-save_dir = os.path.join(par_dir, 'saves')
-log_dir = os.path.join(par_dir, 'logs')
-for d in (save_dir, log_dir):
-    make_path_exist(d)
 
-for env_sz in np.arange(5, 15):
+for env_sz in np.arange(4, 5):
     N_OBS = env_sz
     N_ACT = env_sz
 
@@ -279,20 +271,25 @@ for env_sz in np.arange(5, 15):
         np.random.seed(RANDOM_SEED)
         params['seed'] = RANDOM_SEED
 
-        '''Create environments with same dynamics, duh'''
-        env = RandomEnv(N_OBS, N_ACT, estimate_scaling=False)
+        '''Name agent (model) and create sub dirs required for saving and logging'''
+        model_name = f'{algo}_' + f'IdentityEnv_{env_sz}obsx{env_sz}act' + f'_{RANDOM_SEED}seed'
+        model_dir = os.path.join(par_dir, model_name)
+        model_save_dir = os.path.join(model_dir, 'saves')
+        model_log_dir = os.path.join(model_dir, 'logs')
+        for fn in (model_save_dir, model_log_dir):
+            if not os.path.exists(fn):
+                os.makedirs(fn)
+        params['tensorboard_log'] = model_log_dir
 
-        '''Reload dynamics already created for this size RE or save new RE dynamics for this size (size=obs_spacexact_space)'''
-        try:
-            env.load_dynamics(COMMON_ENV_DIR)
-        except:
-            env.save_dynamics(COMMON_ENV_DIR)
+        '''Create environments with identity dynamics, duh'''
+        env = RandomEnv(N_OBS, N_ACT, estimate_scaling=False)
+        env.rm = np.diag(np.ones(N_OBS))
+        env.pi = np.diag(np.ones(N_OBS))
+        env.save_dynamics(model_dir)
+
         eval_env = RandomEnv(N_OBS, N_ACT, model_info=env.model_info)
         params['env'] = env
 
-        '''Name agent (model) and create sub dir required for saving'''
-        # model_name = f'{algo}_' + repr(env) + f'_seed{RANDOM_SEED}'
-        model_name = f'{algo}_' + f'IdentityEnv_{env_sz}obsx{env_sz}act' + f'_seed{RANDOM_SEED}'
 
         '''Agent'''
         if 'PPO' in algo:
@@ -302,18 +299,16 @@ for env_sz in np.arange(5, 15):
         # print(f'-> Policy nb. of parameters: {count_parameters(model.actor)}')
 
         '''Callback evaluated agent every EVAL_FREQ steps and saved best model, and auto-saves every CHKPT_FREQ steps'''
-        model_dir = os.path.join(save_dir, model_name)
-        make_path_exist(model_dir)
-        eval_callback = EvalCheckpointEarlyStopTrainingCallback(env=eval_env, save_dir=model_dir,
+        eval_callback = EvalCheckpointEarlyStopTrainingCallback(env=eval_env, save_dir=model_save_dir,
                                                                 EVAL_FREQ=EVAL_FREQ, CHKPT_FREQ=CHKPT_FREQ)
-        writer = get_writer(model_name, session_name, COMET_WORKSPACE)
-        model.set_logger(writer)
+        # writer = get_writer(model_name, session_name, COMET_WORKSPACE)
+        # model.set_logger(writer)
         # eval_callback.init_callback(model, writer)
 
-        writer.log_parameters(params)
+        # model.logger.log_parameters(params)
 
         '''Log some more info and save it in the same directory as the agent'''
-        with open(os.path.join(log_dir, 'info.txt'), 'w') as f:
+        with open(os.path.join(model_dir, 'info.txt'), 'w') as f:
             '''Log hyperparameters used in this experiment'''
             f.write(f'-> {algo} parameters\n')
             for k, v in params.items():
