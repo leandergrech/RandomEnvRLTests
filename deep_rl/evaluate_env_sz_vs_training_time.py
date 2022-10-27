@@ -165,8 +165,9 @@ def plot_compare_ppo_trpo():
 
 
 if __name__ == '__main__':
+    # create_ppo_result_heuristics()
     # create_trpo_result_heuristics()
-    # for algo_name in ('trpo', 'ppo'):
-    #     plot_result_heuristics(algo_name, True)
-    #     plot_result_heuristics(algo_name, False)
+    for algo_name in ('trpo', 'ppo'):
+        plot_result_heuristics(algo_name, True)
+        plot_result_heuristics(algo_name, False)
     plot_compare_ppo_trpo()

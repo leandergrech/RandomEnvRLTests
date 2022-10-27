@@ -2,7 +2,7 @@ import os
 import numpy as np
 from datetime import datetime as dt
 from collections import deque
-# import comet_ml
+import comet_ml
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 import torch as t
@@ -11,7 +11,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from sb3_contrib import TRPO
 from random_env.envs import RandomEnv, RunningStats
-# from my_agents_utils import make_path_exist, get_writer, count_parameters
+from my_agents_utils import make_path_exist, get_writer, count_parameters
 
 
 class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
@@ -158,10 +158,21 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
                 print(f'\t-> FPS = {fps:.2f}')
                 print('')
 
-            for tag, val in zip(('eval/episode_return', 'eval/episode_length', 'eval/success', 'eval/rew_final_neg_init',
-                                 'eval/expected_rew_per_step', 'train/fps'),
-                                (returns, ep_lens, success, rew_final_neg_init, expected_rew_per_step, fps)):
-                self.logger.record(tag, val)
+            # Tensorboard
+            # for tag, val in zip(('eval/episode_return', 'eval/episode_length', 'eval/success', 'eval/rew_final_neg_init',
+            #                      'eval/expected_rew_per_step', 'train/fps'),
+            #                     (returns, ep_lens, success, rew_final_neg_init, expected_rew_per_step, fps)):
+            #     self.logger.record(tag, val)
+            # Comet-ml
+            self.logger.log_metrics({'eval/episode_return': returns,
+                                     'eval/episode_length': ep_lens,
+                                     'eval/success': success,
+                                     'eval/rew_final_neg_init': rew_final_neg_init,
+                                     'eval/expected_rew_per_step': expected_rew_per_step,
+                                     'spaces/obs_mean': obs_mean, 'spaces/obs_std': obs_std,
+                                     'spaces/act_mean': act_mean, 'spaces/act_std': act_std,
+                                     'spaces/trim_mean': trim_mean, 'spaces/trim_std': trim_std,
+                                     'train/fps': fps}, step=self.num_timesteps)
 
             ### SAVE SUCCESSFUL AGENTS ###
             if success > 50.0:
@@ -182,7 +193,7 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
 
 COMET_WORKSPACE = 'testing-ppo-trpo'
 COMMON_ENV_DIR = '../identity_envs'
-algo = 'PPO'
+algo = 'TRPO'
 
 if 'PPO' in algo:
     # '''
@@ -258,10 +269,11 @@ CHKPT_FREQ = 50000
 
 params = DEFAULT_PARAMS.copy()
 # session_name = dt.strftime(dt.now(), f'sess_{algo.lower()}_%m%d%y_%H%M%S')
-session_name = 'sess_ppo_102422_150542'
+# session_name = 'sess_trpo_102422_150542'
+session_name = 'sess_trpo_050522_131337'
 par_dir = os.path.join('sb3_identityenv_training', session_name)
 
-for env_sz in np.arange(4, 5):
+for env_sz in np.arange(2, 5):
     N_OBS = env_sz
     N_ACT = env_sz
 
@@ -301,11 +313,10 @@ for env_sz in np.arange(4, 5):
         '''Callback evaluated agent every EVAL_FREQ steps and saved best model, and auto-saves every CHKPT_FREQ steps'''
         eval_callback = EvalCheckpointEarlyStopTrainingCallback(env=eval_env, save_dir=model_save_dir,
                                                                 EVAL_FREQ=EVAL_FREQ, CHKPT_FREQ=CHKPT_FREQ)
-        # writer = get_writer(model_name, session_name, COMET_WORKSPACE)
-        # model.set_logger(writer)
-        # eval_callback.init_callback(model, writer)
+        writer = get_writer(model_name, session_name, COMET_WORKSPACE)
+        model.set_logger(writer)
 
-        # model.logger.log_parameters(params)
+        model.logger.log_parameters(params)
 
         '''Log some more info and save it in the same directory as the agent'''
         with open(os.path.join(model_dir, 'info.txt'), 'w') as f:
