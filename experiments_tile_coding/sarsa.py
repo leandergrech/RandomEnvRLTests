@@ -2,7 +2,7 @@ import os
 import warnings
 warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 
-from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions
+from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions, get_reduced_discrete_actions
 from tile_coding_re.tiles3_qfunction import Tilings, QValueFunctionTiles3
 from utils.eval_utils import eval_agent
 
@@ -30,7 +30,8 @@ def train_instance(**kwargs):
     if env_save_path:
         env.save_dynamics(env_save_path)
 
-    actions = get_discrete_actions(n_act, 3)
+    # actions = get_discrete_actions(n_act, 3)
+    actions = get_reduced_discrete_actions(n_act, 3)
     n_actions = len(actions)
     env_ranges = [[l, h] for l, h in zip(env.observation_space.low, env.observation_space.high)]
 

@@ -3,6 +3,10 @@ from numpy import nanmin as npmin, nanmax as npmax, array
 
 from matplotlib.ticker import MultipleLocator
 
+def recolor_yaxis(ax, c):
+    ax.spines.right.set_color(c)
+    ax.yaxis.label.set_color(c)
+    ax.tick_params(axis='y', colors=c)
 
 def grid_on(ax, axis='y', major_loc=None, minor_loc=None, major_grid=True, minor_grid=True):
     if axis == 'y':
@@ -16,7 +20,7 @@ def grid_on(ax, axis='y', major_loc=None, minor_loc=None, major_grid=True, minor
         axis_.set_minor_locator(MultipleLocator(minor_loc))
     ax.minorticks_on()
     if major_grid:
-        ax.grid(which='major', c='gray', axis=axis)
+        ax.grid(which='major', c='gray', axis=axis, alpha=0.5)
     if minor_grid:
         ax.grid(which='minor', c='gray', ls='--', alpha=0.5, axis=axis)
 

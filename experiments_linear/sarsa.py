@@ -5,7 +5,7 @@ from collections import deque
 warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 
 from random_env.envs import RandomEnvDiscreteActions as REDA, get_discrete_actions, get_reduced_discrete_actions
-from linear_q_function import QValueFunctionLinear, FeatureExtractor#, EfficientFeatureExtractor, QValueFunctionLinearEfficient
+from experiments_linear.linear_q_function import QValueFunctionLinear, FeatureExtractor#, EfficientFeatureExtractor, QValueFunctionLinearEfficient
 from utils.eval_utils import eval_agent
 
 from tqdm import trange

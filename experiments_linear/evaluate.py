@@ -79,7 +79,7 @@ def plot_experiment_training_stats(exp_dir, exp_label):
     ax = axs[0]
     ep_lens_mean = np.mean(ep_lens, axis=1)
     ep_lens_std = np.std(ep_lens, axis=1)
-    el_line, = ax.plot(xrange, ep_lens_mean, ls='dashed', label=f'{exp_label} Mean')
+    el_line, = ax.plot(xrange, ep_lens_mean, marker='o', ls='dashed', label=f'{exp_label} Mean')
     ax.set_title('Using greedy policy')
     ax.set_ylabel('Episode length')
     grid_on(ax, 'y', major_loc=20, minor_loc=5, major_grid=True, minor_grid=False)
@@ -87,7 +87,7 @@ def plot_experiment_training_stats(exp_dir, exp_label):
     ax = axs[1]
     returns_mean = np.mean(returns, axis=1)
     returns_std = np.std(returns, axis=1)
-    ret_line, = ax.plot(xrange, returns_mean, ls='dashed', label=f'{exp_label} Mean')
+    ret_line, = ax.plot(xrange, returns_mean, marker='o', label=f'{exp_label} Mean')
     # ax.set_yscale('symlog')
     # ax.yaxis.set_major_locator(mpl.ticker.LogLocator(10, (np.arange(2, 10, 2))))
     grid_on(ax, 'y', major_loc=np.ptp(returns_mean)//10, minor_loc=np.ptp(returns_mean)//25, major_grid=True, minor_grid=True)
@@ -96,7 +96,7 @@ def plot_experiment_training_stats(exp_dir, exp_label):
     ax = axs[2]
     regrets_mean = np.mean(regrets, axis=1)
     regrets_std = np.std(regrets, axis=1)
-    reg_line, = ax.plot(xrange, regrets_mean, ls='dashed', label=f'{exp_label} Mean')
+    reg_line, = ax.plot(xrange, regrets_mean, marker='o', label=f'{exp_label} Mean')
     ax.set_ylabel('Regrets')
 
     data_lines = [el_line, ret_line, reg_line]
@@ -113,7 +113,7 @@ def plot_experiment_training_stats(exp_dir, exp_label):
         grid_on(ax, 'x', major_loc=maxx//10, minor_loc=maxx//50)
 
         axx1 = ax.twinx()
-        lr_line, = axx1.plot(xrange, lrs, c='g', lw=2       )
+        lr_line, = axx1.plot(xrange, lrs, c='g', lw=2)
         axx1.set_ylabel('Learning rate')
         axx1.yaxis.label.set_color(lr_line.get_color())
         axx1.tick_params(axis='y', colors=lr_line.get_color())
@@ -322,10 +322,14 @@ def plot_episodes(exp_dir, train_step, env, nrows=2, ncols=4, save_dir=None,
     n_obs, n_act = env.obs_dimension, env.act_dimension
     init_func = env.reset
 
-    fig, axs = plt.subplots(nrows * 2, ncols, figsize=(30, 15))
+    fig, axs = plt.subplots(nrows * 2, ncols, figsize=(20, 15))
     # axs = np.ravel(axs)
     nb_eps = nrows * ncols
 
+    label_fs = 18
+    title_fs = 22
+
+    max_ep_len = -np.inf
     for i in range(nb_eps):
         obses = []
         acts = []
@@ -343,11 +347,16 @@ def plot_episodes(exp_dir, train_step, env, nrows=2, ncols=4, save_dir=None,
             acts.append(a)
 
             step += 1
+        max_ep_len = max(step, max_ep_len)
         obses = np.array(obses)
         acts = np.array(acts) - 1
 
-        ax_obs = axs[(i // ncols) * 2, i % ncols]
-        ax_act = axs[(i // ncols) * 2 + 1, i % ncols]
+        if nb_eps == 1:
+            ax_obs = axs[0]
+            ax_act = axs[1]
+        else:
+            ax_obs = axs[(i // ncols) * 2, i % ncols]
+            ax_act = axs[(i // ncols) * 2 + 1, i % ncols]
 
         ax_obs.set_title(f'Ep {i + 1}', size=15)
         ax_obs.axhline(-env.GOAL, c='g', ls='--', lw=2)
@@ -359,19 +368,101 @@ def plot_episodes(exp_dir, train_step, env, nrows=2, ncols=4, save_dir=None,
         ax_act.plot(acts, c='r')
 
         for ax, ylab in zip((ax_obs, ax_act), ('States', 'Actions')):
-            grid_on(ax, 'x', 20, 5, True, False)
+            print(max_ep_len)
+            grid_on(ax, 'x', max_ep_len//5, max_ep_len//25, True, True)
             # ax.set_xticks(np.arange(step))
-            ax.set_ylabel(ylab, size=12)
+            ax.set_ylabel(ylab, size=label_fs)
 
         ax_obs.get_shared_x_axes().join(ax_obs, ax_act)
-        ax_act.set_xlabel('Step', size=12)
+        ax_act.set_xlabel('Step', size=label_fs)
 
     fig.suptitle(f'Environment: {repr(env)}\n'
                  f'Experiment:  {exp_dir}\n'
-                 f'At step:     {train_step}')
+                 f'At step:     {train_step}', size=title_fs)
     fig.tight_layout()
     fig.savefig(os.path.join(save_dir, f'{train_step}_step.png'))
     # plt.show()
+
+# def plot_episodes_actfail(exp_dir, train_step, env, nb_failures, nrows=2, ncols=4, save_dir=None,
+#                   qvf_type=QValueFunctionLinear):
+#     if save_dir is None:
+#         save_dir = exp_dir
+#
+#     # env = env_type.load_from_dir(exp_dir)
+#     # if transform_to_env_type is not None:
+#     #     env = transform_to_env_type(env.obs_dimension, env.act_dimension, state_clip=env.state_clip, model_info=env.model_info)
+#     q_func_file = os.path.join(exp_dir, 'q_func', f'q_step_{train_step}.pkl')
+#     # q = QValueFunctionLinear.load(q_func_file)
+#     q = qvf_type.load(q_func_file)
+#     n_obs, n_act = env.obs_dimension, env.act_dimension
+#     init_func = env.reset
+#
+#     fig, axs = plt.subplots(nrows * 2, ncols, figsize=(15, 10))
+#     # axs = np.ravel(axs)
+#     nb_eps = nrows * ncols
+#
+#     label_fs = 18
+#     title_fs = 22
+#
+#     max_ep_len = -np.inf
+#     for i in range(nb_eps):
+#         obses = []
+#         acts = []
+#         d = False
+#         o = env.reset(init_func())
+#         obses.append(o.copy())
+#         acts.append(np.zeros(n_act))
+#         step = 1
+#
+#         action_malfunctions = np.random.choice(len(q.actions), nb_failures)
+#         action_mask = [1 if i in action_malfunctions else 0 for i in range(len(q.actions))]
+#         while not d:
+#             action_idx = q.greedy_action(o)
+#             if action_idx in action_malfunctions:
+#                 for _ in range(int(1/env.ACTION_EPS)):
+#                     *_ = env.step()
+#             a = q.actions[action_idx]
+#             otp1, _, d, _ = env.step(a)
+#             o = otp1.copy()
+#
+#             obses.append(o)
+#             acts.append(a)
+#
+#             step += 1
+#         max_ep_len = max(step, max_ep_len)
+#         obses = np.array(obses)
+#         acts = np.array(acts) - 1
+#
+#         if nb_eps == 1:
+#             ax_obs = axs[0]
+#             ax_act = axs[1]
+#         else:
+#             ax_obs = axs[(i // ncols) * 2, i % ncols]
+#             ax_act = axs[(i // ncols) * 2 + 1, i % ncols]
+#
+#         ax_obs.set_title(f'Ep {i + 1}', size=15)
+#         ax_obs.axhline(-env.GOAL, c='g', ls='--', lw=2)
+#         ax_obs.axhline(env.GOAL, c='g', ls='--', lw=2)
+#         ax_obs.plot(obses, c='b')
+#         grid_on(ax_obs, 'y', 0.1, 0.02, True, False)
+#
+#         ax_act.axhline(0.0, c='k', ls='-.', lw=2)
+#         ax_act.plot(acts, c='r')
+#
+#         for ax, ylab in zip((ax_obs, ax_act), ('States', 'Actions')):
+#             print(max_ep_len)
+#             grid_on(ax, 'x', max_ep_len//5, max_ep_len//25, True, True)
+#             # ax.set_xticks(np.arange(step))
+#             ax.set_ylabel(ylab, size=label_fs)
+#
+#         ax_obs.get_shared_x_axes().join(ax_obs, ax_act)
+#         ax_act.set_xlabel('Step', size=label_fs)
+#
+#     fig.suptitle(f'Environment: {repr(env)}\n'
+#                  f'Experiment:  {exp_dir}\n'
+#                  f'At step:     {train_step}', size=title_fs)
+#     fig.tight_layout()
+#     fig.savefig(os.path.join(save_dir, f'{train_step}_step_{nb_failures}_action_malfunction.png'))
 
 
 def plot_weight_evolution(exp_dir, save_dir=None):
@@ -486,7 +577,8 @@ def plot_weight_evolution(exp_dir, save_dir=None):
 #     plt.show()
 
 
-def plot_q_vals_region_sampling_tracking_states(experiment_dir, env, save_dir=None):
+def plot_q_vals_region_sampling_tracking_states(experiment_dir, env, save_dir=None, nb_regions=5,
+                                                nb_samples_per_region=100):
     if save_dir is None:
         save_dir = experiment_dir
 
@@ -498,7 +590,6 @@ def plot_q_vals_region_sampling_tracking_states(experiment_dir, env, save_dir=No
 
     # Creating tracking regions
     nb_samples_per_region = 200
-    nb_regions = 5
     rstep = 1 / nb_regions
 
     tracking_states = []
@@ -562,16 +653,20 @@ def plot_q_vals_region_sampling_tracking_states(experiment_dir, env, save_dir=No
 
 if __name__ == '__main__':
     # exp_pardir = 'ramp_env_size_102322_183706'
-    exp_pardir = 'ramp_env_size_102322_201202'
+    # exp_pardir = 'ramp_env_size_102322_201202'
+    # exp_name = 'sarsa_110222_145343'
+    exp_name = 'sarsa_110222_151025'
+    exp_pardir = os.path.join('experiment_gaussian', exp_name)
+    # exp_pardir = 'ramp_env_size_102022_104654'
     # exp_pardir = get_latest_experiment('.', offset=0)
-    # exp_subdir = '2obsx2act_678seed'
-    n_obs=n_act = 25
-    random_seed = 123
-    exp_subdir = f'{n_obs}obsx{n_act}act_{random_seed}seed'
-    print(f'Evaluating experiment: {exp_pardir}\n'
-          f'Sub-experiment: {exp_subdir}')
+    # n_obs=n_act = 5
+    # random_seed = 567
+    # exp_subdir = f'{n_obs}obsx{n_act}act_{random_seed}seed'
+    # print(f'Evaluating experiment: {exp_pardir}\n'
+    #       f'Sub-experiment: {exp_subdir}')
 
-    exp_dir = os.path.join(exp_pardir, exp_subdir)
+    # exp_dir = os.path.join(exp_pardir, exp_subdir)
+    exp_dir = exp_pardir
 
     env = REDAClipCont.load_from_dir(exp_dir)
     env = REDAClip(n_obs=env.obs_dimension, n_act=env.act_dimension,
@@ -583,10 +678,11 @@ if __name__ == '__main__':
     #     plot_episodes(exp_dir=exp_dir, train_step=train_step, env_type=REDAClipCont, transform_to_env_type=REDAClip,
     #                   save_dir=exp_pardir, nrows=2, ncols=3)
 
-    train_step = 250000
+    # train_step = 108800
+    train_step = 4284
     plot_episodes(exp_dir=exp_dir, train_step=train_step, env=env, save_dir=exp_dir, nrows=2, ncols=2)
 
-    # create_training_stats(exp_dir, env=env, eval_eps=5)
+    # create_training_stats(exp_dir, env=env, eval_eps=10)
     # plot_experiment_training_stats(exp_dir, 'Linear RL')
 
     # # plot_experiment_all_subs_training_stats(exp_pardir, 'Linear RL')

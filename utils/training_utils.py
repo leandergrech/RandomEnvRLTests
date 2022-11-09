@@ -249,6 +249,7 @@ class TrajBuffer:
     def reset(self):
         self.o_ = []
         self.a_ = []
+        self.otp1_ = []
         self.r_ = []
         self.g_ = []
 
@@ -261,10 +262,12 @@ class TrajBuffer:
         else:
             return False
 
-    def add(self, state, action, reward):
+    def add(self, state, action, reward, next_state=None):
         self.o_.append(state.copy())
         self.a_.append(action.copy())
         self.r_.append(reward)
+        if next_state is not None:
+            self.otp1_.append(next_state.copy())
 
     def get_returns(self):
         return np.flip(np.cumsum(np.flip(self.r_))).tolist()
@@ -275,6 +278,12 @@ class TrajBuffer:
         gammas = [gamma**item for item in range(N)]
 
         self.g_ = [np.sum(np.multiply(r[i:], gammas[:N-i])) for i in range(N)]
+
+    def sample_batch(self, batch_size):
+        if batch_size > len(self):
+            return None
+        temp = np.random.choice(len(self), batch_size).astype(int)
+        return np.array(self.o_)[temp], np.array(self.a_)[temp], np.array(self.r_)[temp], np.array(self.otp1_)[temp]
 
 
     def pop_target_tuple(self):

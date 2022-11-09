@@ -139,6 +139,13 @@ class REDACont(RandomEnvDiscreteActions):
 
 
 class REDAClip(RandomEnvDiscreteActions):
+    """
+    Idea behind this environment is that we bind the states to be within state_clip l2 distance away. The reward
+    returned when a state tries to go beyond state_clip is guaranteed to be lower than a reward given within bounds
+    of the state.
+    Note that this environment is episodic. See self.EPISODE_LENGTH_LIMIT to control the maximum allowable length
+    in an episode.
+    """
     yaml_tag = '!REDAClip'
     def __init__(self, n_obs, n_act, state_clip=0.0, **kwargs):
         super(REDAClip, self).__init__(n_obs, n_act, **kwargs)
@@ -194,6 +201,7 @@ class REDAClip(RandomEnvDiscreteActions):
         env.pi = np.array(d['pi'])
         env.trim_stats = d['trim_stats']
         return env
+
 
 
 class REDAClipCont(REDAClip):

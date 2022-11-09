@@ -7,7 +7,7 @@ import comet_ml
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 import torch as t
 
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, TD3
 from stable_baselines3.common.callbacks import BaseCallback
 from sb3_contrib import TRPO
 from random_env.envs import RandomEnv, RunningStats
@@ -39,6 +39,7 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
         self.last_call_step = None
 
         self.EVAL_FREQ = EVAL_FREQ
+        self._eval_freq = EVAL_FREQ
         self.CHKPT_FREQ = CHKPT_FREQ
 
         self.current_best_model_ep_len = self.env.EPISODE_LENGTH_LIMIT
@@ -52,6 +53,8 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
 
         self.steps_since_last_animation = 0
         self.verbose = True
+
+        self.success_history = deque(maxlen=self.END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES)
 
     def __call__(self, *args, **kwargs):
         pass
@@ -95,7 +98,8 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
                 step = 0
                 d = False
                 while not d:
-                    a = self.model.predict(o, deterministic=True)[0]
+                    # a = self.model.predict(o, deterministic=True)[0]
+                    a = self.model.predict(o, deterministic=True)
                     step += 1
 
                     o2, r, d, _ = self.env.step(a)
@@ -121,7 +125,9 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
 
             returns = np.mean(returns)
             ep_lens = np.mean(ep_lens)
-            success = np.mean(success) * 100.0
+            success = np.mean(success)
+            self.success_history.append(success == 1.0)
+            success *= 100.0
             rew_final_neg_init = np.mean(rew_final_neg_init)
             expected_rew_per_step = np.mean(expected_rew_per_step)
 
@@ -174,16 +180,22 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
                                      'spaces/trim_mean': trim_mean, 'spaces/trim_std': trim_std,
                                      'train/fps': fps}, step=self.num_timesteps)
 
-            ### SAVE SUCCESSFUL AGENTS ###
-            if success > 50.0:
-                self.quick_save()
-                if success >= EvalCheckpointEarlyStopTrainingCallback.SUCCESS_THRESHOLD:
-                    self.successes.append(1)
-                else:
-                    self.successes.clear()
+            # if sum(self.success_history) > 0 and self.EVAL_FREQ > 100:
+            #     self.EVAL_FREQ = 100
 
-                if len(self.successes) >= EvalCheckpointEarlyStopTrainingCallback.END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES:
-                    return False  # End training
+            if sum(self.success_history) > 1 and self.success_history[-1]:
+                if self.EVAL_FREQ > 1:
+                    self.EVAL_FREQ = self.EVAL_FREQ // 2
+            else:
+                self.EVAL_FREQ = self._eval_freq
+
+            if self.success_history[-1]:
+                self.quick_save()
+
+            if sum(self.success_history) == self.END_TRAINING_AFTER_N_CONSECUTIVE_SUCCESSES:
+                self.quick_save()
+
+                return False  # End training
 
         if self.num_timesteps % self.CHKPT_FREQ == 0:
             self.quick_save()
@@ -191,9 +203,10 @@ class EvalCheckpointEarlyStopTrainingCallback(BaseCallback):
         return True
 
 
-COMET_WORKSPACE = 'testing-ppo-trpo'
-COMMON_ENV_DIR = '../identity_envs'
-algo = 'TRPO'
+# COMET_WORKSPACE = 'testing-ppo-trpo'
+COMET_WORKSPACE = 'testing-off-policy]'
+# COMMON_ENV_DIR = '../identity_envs'
+algo = 'TD3'
 
 if 'PPO' in algo:
     # '''
@@ -262,18 +275,42 @@ elif 'TRPO' in algo:
         device='auto',
         _init_setup_model=True
     )
+elif 'TD3' in algo:
+    DEFAULT_PARAMS = dict(
+        policy='MlpPolicy',
+        learning_rate=1e-3,
+        buffer_size=1_000_000,  # 1e6
+        learning_starts=100,
+        batch_size=100,
+        tau=5e-3,
+        gamma=0.99,
+        train_freq=(1, "episode"),
+        gradient_steps=-1,
+        action_noise=None,
+        replay_buffer_class=None,
+        replay_buffer_kwargs=None,
+        optimize_memory_usage=False,
+        policy_delay=2,
+        target_policy_noise=0.2,
+        target_noise_clip=0.5,
+        tensorboard_log=None,
+        create_eval_env=False,
+        policy_kwargs={'net_arch':[64, 64]},
+        verbose=0,
+        seed=None
+    )
 
 NB_STEPS = int(5e6)
 EVAL_FREQ = 1000
 CHKPT_FREQ = 50000
 
 params = DEFAULT_PARAMS.copy()
-# session_name = dt.strftime(dt.now(), f'sess_{algo.lower()}_%m%d%y_%H%M%S')
+session_name = dt.strftime(dt.now(), f'sess_{algo.lower()}_%m%d%y_%H%M%S')
 # session_name = 'sess_trpo_102422_150542'
-session_name = 'sess_trpo_050522_131337'
+# session_name = f'sess_{algo.lower()}_050522_131337'
 par_dir = os.path.join('sb3_identityenv_training', session_name)
 
-for env_sz in np.arange(2, 5):
+for env_sz in np.arange(2, 3):
     N_OBS = env_sz
     N_ACT = env_sz
 
@@ -308,6 +345,8 @@ for env_sz in np.arange(2, 5):
             model = PPO(**params)
         elif 'TRPO' in algo:
             model = TRPO(**params)
+        elif 'TD3' in algo:
+            model = TD3(**params)
         # print(f'-> Policy nb. of parameters: {count_parameters(model.actor)}')
 
         '''Callback evaluated agent every EVAL_FREQ steps and saved best model, and auto-saves every CHKPT_FREQ steps'''

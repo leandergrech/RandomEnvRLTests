@@ -13,15 +13,15 @@ from sarsa import train_instance_early_termination
 experiment_dir = f"ramp_env_size_102322_201202"
 
 nb_training_steps = 300000
-eval_every = 500
+eval_every = 100
 save_every = 5000
 eval_eps = 2
-start_eval =100000
+start_eval =80000
 
 explore_until = decay_lr_until = nb_training_steps
 
-exp_fun = LinearDecay(1.0, 1e-2, explore_until, label='EPS')
-lr_fun = LinearDecay(1e-2, 1e-3, decay_lr_until, label='LR')
+exp_fun = LinearDecay(0.5, 1e-2, explore_until, label='EPS')
+lr_fun = LinearDecay(5e-2, 5e-3, decay_lr_until, label='LR')
 gamma = 0.9
 
 if 'EPS' in exp_fun.label:
@@ -29,7 +29,7 @@ if 'EPS' in exp_fun.label:
 else:
     policy = boltzmann
 
-for env_sz in np.arange(21, 25):
+for env_sz in np.arange(22, 25, 2):
     for seed in (123, 234, 345, 456, 567):
         n_obs = n_act = env_sz
         sub_experiment_dir = f"{env_sz}obsx{env_sz}act_{seed}seed"

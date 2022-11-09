@@ -162,8 +162,6 @@ def plot_compare_ppo_trpo():
     fig.savefig(os.path.join(par_dir, 'compare_ppo_vs_trpo.png'))
 
 
-
-
 if __name__ == '__main__':
     # create_ppo_result_heuristics()
     # create_trpo_result_heuristics()
