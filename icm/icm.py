@@ -1,19 +1,15 @@
 import os
 import numpy as np
-import pickle
-
-import stable_baselines3.ppo.policies
+from datetime import datetime as dt
 import torch as t
-import torch.nn
 import torch.nn as nn
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
 from tqdm import trange
-
+import matplotlib.pyplot as plt
 from stable_baselines3.ppo import PPO
 
 from random_env.envs import RandomEnv
-from utils.training_utils import TrajBuffer
+from utils.training_utils import BestSaveCheckpointCallBack
 from utils.plotting_utils import grid_on
 
 
@@ -36,8 +32,8 @@ class StateFeatures(nn.Module):
         TODO: Check other activation functions, e.g. LRELU, ELU, TANH
         Note: ELU was used in the ICM paper actually
         '''
-        state = t.Tensor(state)
-        x = F.relu(self.fc1(state))
+        x = t.Tensor(state)
+        x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         return self.fc3(x)
 
@@ -56,9 +52,10 @@ class ForwardModel(nn.Module):
         self.fc2 = nn.Linear(h[0], h[1])
         self.fc3 = nn.Linear(h[1], self.feature_size)
 
-
     def forward(self, phi, action):
-        x = t.Tensor(np.hstack([phi, action]))
+        phi = t.Tensor(phi)
+        action = t.Tensor(action)
+        x = t.Tensor(t.hstack((phi, action)))
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         return self.fc3(x)
@@ -79,6 +76,8 @@ class InverseModel(nn.Module):
         self.fc3 = nn.Linear(h[1], self.n_act)
 
     def forward(self, phi1, phi2):
+        phi1 = t.Tensor(phi1)
+        phi2 = t.Tensor(phi2)
         x = t.concat([phi1, phi2])
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
@@ -111,15 +110,20 @@ class ICM(nn.Module):
 
 
 class ICM_RandomEnv(RandomEnv):
-    def __init__(self, n_obs, n_act, **kwargs):
+    def __init__(self, n_obs, n_act, fm_kw=None, im_kw=None, sf_kw=None, **kwargs):
         super(ICM_RandomEnv, self).__init__(n_obs, n_act, **kwargs)
 
-        self.icm = ICM(self, fm_kw=dict(h=[10,10], feature_size=10),
-                      im_kw=dict(h=[10, 10], feature_size=10),
-                      sf_kw=dict(h=[10, 10], feature_size=10))
+        if fm_kw is None:
+            fm_kw = dict(h=[10, 10], feature_size=10)
+        if im_kw is None:
+            im_kw = dict(h=[10, 10], feature_size=10)
+        if sf_kw is None:
+            sf_kw = dict(h=[10, 10], feature_size=10)
 
-        self.lr = 1e-2
-        self.beta = 0.5
+        self.icm = ICM(self, fm_kw=fm_kw, im_kw=im_kw, sf_kw=sf_kw)
+
+        self.lr = 1e-3
+        self.beta = 0.2
         self.neta = 1.0
         self.optim = t.optim.SGD(self.icm.parameters(), lr=self.lr)
         self.loss_fn1 = nn.MSELoss()
@@ -155,8 +159,9 @@ class ICM_RandomEnv(RandomEnv):
         loss1 = self.loss_fn1(phi2_estimate, phi2)
         loss2 = self.loss_fn2(action_estimate, t.Tensor(action))
 
-        loss1.backward()
-        loss2.backward()
+        loss = self.beta * loss1 + (1 - self.beta) * loss2
+
+        loss.backward()
 
         self.optim.step()
 
@@ -338,26 +343,33 @@ def train_icm_and_compare_to_re_random_trajectories():
     fig.tight_layout()
     plt.show()
 
-from stable_baselines3.ppo import PPO
-from stable_baselines3.ppo.policies import MlpPolicy
-from stable_baselines3.common.callbacks import CheckpointCallback
-from datetime import datetime as dt
 
 def train_ppo_compare_icmre_vs_re():
     n_obs, n_act = 2, 2
     max_steps = 100
 
-    seed = 123
+    env_seed = 123
+    feature_size = 2
+    icm_hidden_layers = [5, 5]
+    icm_kwargs = dict(fm_kw=dict(h=icm_hidden_layers, feature_size=feature_size),
+                      im_kw=dict(h=icm_hidden_layers, feature_size=feature_size),
+                      sf_kw=dict(h=icm_hidden_layers, feature_size=feature_size))
 
+    envs = []
+    envs.append(ICM_RandomEnv(n_obs=n_obs, n_act=n_act, estimate_scaling=True, **icm_kwargs))
+    envs.append(RandomEnv(n_obs=n_obs, n_act=n_act, model_info=envs[0].model_info))
 
-    envs = [RandomEnv(n_obs=n_obs, n_act=n_act, estimate_scaling=True)]
-    envs.append(ICM_RandomEnv(n_obs=n_obs, n_act=n_act, model_info=envs[0].model_info))
+    for env in envs:
+        env.EPISODE_LENGTH_LIMIT = max_steps
+        env.max_steps = max_steps
+        env.seed(env_seed)
 
-    model_prefix = f'{PPO}_{repr(envs[0])}'
+    model_prefix = lambda seed: f'{PPO}_{repr(envs[0])}_{seed}seed'
 
-    policy_kwargs = dict(net_arch=[dict(vf=[32, 32], pi=[32, 32])],
+    policy_kwargs = dict(net_arch=[dict(vf=[16, 16], pi=[16, 16])],
                          activation_fn=t.nn.ReLU)
-    ppo_kwargs = dict(policy=stable_baselines3.ppo.policies.MlpPolicy,
+
+    ppo_kwargs = dict(policy='MlpPolicy',
                       learning_rate=3e-4,
                       n_steps=2048,
                       batch_size=64,
@@ -377,62 +389,19 @@ def train_ppo_compare_icmre_vs_re():
                       create_eval_env=False,
                       policy_kwargs=policy_kwargs,
                       verbose=1,
-                      seed=seed,
+                      # seed=seed,  SET EXTERNALLY
                       device="auto",
                       _init_setup_model=True,)
 
     total_train_timesteps = int(5e5)
-    save_freq = 10000
+    save_freq = 1000
     eval_freq = 500
     n_eval_episodes = 10
 
-    class BestSaveCheckpointCallBack(CheckpointCallback):
-        def __init__(self, save_freq, save_dir, **kwargs):
-            super(BestSaveCheckpointCallBack, self).__init__(save_freq, save_dir, **kwargs)
-            self.save_freq = save_freq
-            self.save_dir = save_dir
-
-            self.best_average_return = -np.inf
-
-        def _on_step(self) -> bool:
-            super(BestSaveCheckpointCallBack, self)._on_step()
-
-            if not self.n_calls % self.locals['eval_freq'] == 0:
-                return True
-
-            _env = self.locals['eval_env']
-            total_reward = 0
-            total_steps = 0
-
-            nb_eps = self.locals['n_eval_episodes']
-            for ep in range(nb_eps):
-                o = _env.reset()
-                _d = False
-                _step = 0
-                while not _d:
-                    _a = self.model.predict(observation=o, deterministic=True)[0]
-                    _otp1, _r, _d, _info = _env.step(_a)
-
-                    _step += 1
-                    _o = _otp1.copy()
-
-                    total_reward += _r
-                total_steps += _step
-
-            average_reward = total_reward / total_steps
-            average_ep_len = total_steps / nb_eps
-
-            self.logger.record('eval/total_reward', total_reward)
-            self.logger.record('eval/average_reward', average_reward)
-            self.logger.record('eval/average_ep_len', average_ep_len)
-
-            average_return = average_reward * average_ep_len
-            if self.best_average_return <= average_return:
-                self.best_average_return = average_return
-                self.model.save(f'{self.name_prefix}_{self.num_timesteps}_steps.zip')
-
     def train(env, ppo_kwargs):
         nonlocal save_freq, eval_freq, n_eval_episodes, total_train_timesteps
+
+        seed = ppo_kwargs['seed']
 
         par_dir = 'ppo_icm_experiments'
         model_name = f'PPO_{repr(env)}_{dt.now().strftime("%m%d%y_%H%M%S")}'
@@ -441,20 +410,39 @@ def train_ppo_compare_icmre_vs_re():
         tensorboard_dir = os.path.join(model_dir, 'log')
         save_dir = os.path.join(model_dir, 'saves')
 
-        callbacks = [BestSaveCheckpointCallBack(save_freq=save_freq, save_dir=save_dir, name_prefix=model_prefix)]
+        callbacks = [BestSaveCheckpointCallBack(save_freq=save_freq, save_dir=save_dir, name_prefix=model_prefix(seed))]
 
         ppo_kwargs['tensorboard_log'] = tensorboard_dir
         ppo_kwargs['env'] = env
         agent = PPO(**ppo_kwargs)
 
         eval_env = RandomEnv(n_obs=n_obs, n_act=n_act, model_info=env.model_info)
-        agent.learn(total_timesteps=total_train_timesteps, callback=callbacks, log_interval=10,
+        agent.learn(total_timesteps=total_train_timesteps, callback=callbacks, log_interval=eval_freq//5,
                     eval_env=eval_env, eval_freq=eval_freq, n_eval_episodes=n_eval_episodes)
 
-    for env in envs:
-        train(env, ppo_kwargs)
+    for seed in (123, 234, 345, 456, 567):
+        ppo_kwargs['seed'] = seed
+        for env in envs:
+            train(env, ppo_kwargs)
 
 
 if __name__ == '__main__':
     train_ppo_compare_icmre_vs_re()
-
+    # env = RandomEnv(2, 2)
+    # layer_kw = dict(h=[5, 5], feature_size=2)
+    # icm = ICM(env, fm_kw=layer_kw, im_kw=layer_kw, sf_kw=layer_kw)
+    # # for parameter in icm.named_parameters():
+    # #     print(parameter)
+    # print(len([item for item in icm.named_parameters()]))
+    # print(len([item for item in icm.parameters()]))
+    #
+    # print(sum([len(item) for item in icm.named_parameters()]))
+    # print(sum([len(item) for item in icm.parameters()]))
+    #
+    # print([len(item) for item in icm.named_parameters()])
+    # print([len(item) for item in icm.parameters()])
+    #
+    # print([item for item in icm.named_parameters()])
+    # print([item for item in icm.parameters()])
+    #
+    #

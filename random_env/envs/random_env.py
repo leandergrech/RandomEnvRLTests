@@ -125,7 +125,7 @@ class RandomEnv(Env):
         if len(self.reward_deque) >= RandomEnv.REWARD_DEQUE_SIZE and \
                 maxabs_state <= self.GOAL:
             done, success = True, True
-        elif self._it >= self.EPISODE_LENGTH_LIMIT - 1:
+        elif self._it >= self.max_steps - 1:
             done = True
 
         return done, success
@@ -638,8 +638,9 @@ def get_average_ep_len():
 
 
 if __name__ == '__main__':
+    pass
     # get_average_ep_len()
-    quick_testing_randomenv()
+    # quick_testing_randomenv()
 # get_model_output_bounds()
 # dynamic_scale_adjustment_test()
 # scaling_issue_test()

@@ -19,3 +19,6 @@ __pycache__\
 #*.pkl
 #*.yml
 #*.png
+*experiment*
+deep_rl*
+tile_coding_re*

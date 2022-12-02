@@ -1,3 +1,4 @@
+import os.path
 from abc import ABC
 import numpy as np
 import yaml
@@ -353,3 +354,52 @@ def boltzmann(state: np.ndarray, qfunc: QFuncBaseClass, tau: float) -> int:
 
     cum_probas = np.cumsum(qvals_exp / qvals_exp_sum)
     return np.searchsorted(cum_probas, np.random.rand())
+
+
+from stable_baselines3.common.callbacks import CheckpointCallback
+
+
+class BestSaveCheckpointCallBack(CheckpointCallback):
+    def __init__(self, save_freq, save_dir, **kwargs):
+        super(BestSaveCheckpointCallBack, self).__init__(save_freq, save_dir, **kwargs)
+        self.save_freq = save_freq
+        self.save_dir = save_dir
+
+        self.best_average_return = -np.inf
+
+    def _on_step(self) -> bool:
+        super(BestSaveCheckpointCallBack, self)._on_step()
+
+        if not self.n_calls % self.locals['eval_freq'] == 0:
+            return True
+
+        _env = self.locals['eval_env']
+        total_reward = 0
+        total_steps = 0
+
+        nb_eps = self.locals['n_eval_episodes']
+        for ep in range(nb_eps):
+            o = _env.reset()
+            _d = False
+            _step = 0
+            while not _d:
+                _a = self.model.predict(observation=o, deterministic=True)[0]
+                _otp1, _r, _d, _info = _env.step(_a)
+
+                _step += 1
+                _o = _otp1.copy()
+
+                total_reward += _r
+            total_steps += _step
+
+        average_reward = total_reward / total_steps
+        average_ep_len = total_steps / nb_eps
+
+        self.logger.record('eval/total_reward', total_reward)
+        self.logger.record('eval/average_reward', average_reward)
+        self.logger.record('eval/average_ep_len', average_ep_len)
+
+        average_return = average_reward * average_ep_len
+        if self.best_average_return <= average_return:
+            self.best_average_return = average_return
+            self.model.save(os.path.join(self.save_dir, f'{self.name_prefix}_{self.num_timesteps}_steps.zip'))
