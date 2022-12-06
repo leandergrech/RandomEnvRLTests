@@ -33,7 +33,7 @@ class RandomEnv(Env):
         self.REWARD_SCALE = 1.0 # 0.05
         # Have many times smaller should the average state trim be than state space bounds
         self.TRIM_FACTOR = 5.
-        self.EPISODE_LENGTH_LIMIT = 200
+        self.EPISODE_LENGTH_LIMIT = 100
         self.GOAL = 0.1  # state threshold boundary
 
         self.K_p = 1.0

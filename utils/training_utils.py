@@ -286,7 +286,6 @@ class TrajBuffer:
         temp = np.random.choice(len(self), batch_size).astype(int)
         return np.array(self.o_)[temp], np.array(self.a_)[temp], np.array(self.r_)[temp], np.array(self.otp1_)[temp]
 
-
     def pop_target_tuple(self):
         if not self.g_:
             self.calculate_returns(self.discount)
@@ -304,6 +303,10 @@ class TrajBuffer:
     @property
     def o(self):
         return self.o_
+
+    @property
+    def otp1(self):
+        return self.otp1_
 
     @property
     def a(self):
