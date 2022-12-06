@@ -376,6 +376,7 @@ class BestSaveCheckpointCallBack(CheckpointCallback):
         _env = self.locals['eval_env']
         total_reward = 0
         total_steps = 0
+        successes = []
 
         nb_eps = self.locals['n_eval_episodes']
         for ep in range(nb_eps):
@@ -390,14 +391,20 @@ class BestSaveCheckpointCallBack(CheckpointCallback):
                 _o = _otp1.copy()
 
                 total_reward += _r
+            successes.append(_info.get('success', False))
             total_steps += _step
 
         average_reward = total_reward / total_steps
+        average_return = total_reward / nb_eps
         average_ep_len = total_steps / nb_eps
+        average_success = np.mean(successes) * 100.0
 
-        self.logger.record('eval/total_reward', total_reward)
-        self.logger.record('eval/average_reward', average_reward)
-        self.logger.record('eval/average_ep_len', average_ep_len)
+        self.logger.record('eval2/total_reward', total_reward)
+        self.logger.record('eval2/average_reward', average_reward)
+        self.logger.record('eval2/average_return', average_return)
+        self.logger.record('eval2/average_ep_len', average_ep_len)
+        self.logger.record('eval2/average_success(%)', average_success)
+
 
         average_return = average_reward * average_ep_len
         if self.best_average_return <= average_return:

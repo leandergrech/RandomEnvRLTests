@@ -15,6 +15,13 @@ from utils.plotting_utils import grid_on
 
 class StateFeatures(nn.Module):
     def __init__(self, env: RandomEnv, h: list, feature_size=10):
+        """
+        Converts observation to a feature.
+
+        :param env: Environment
+        :param h: List containing size of 2 linear layers
+        :param feature_size: Nb. of dimensions in feature space
+        """
         super(StateFeatures, self).__init__()
         self.n_obs = env.obs_dimension
         self.n_act = env.act_dimension
@@ -40,6 +47,9 @@ class StateFeatures(nn.Module):
 
 class ForwardModel(nn.Module):
     def __init__(self, env: RandomEnv, h: list, feature_size=10):
+        """
+        The forward model of the ICM.
+        """
         super(ForwardModel, self).__init__()
         self.n_obs = env.obs_dimension
         self.n_act = env.act_dimension
@@ -63,6 +73,10 @@ class ForwardModel(nn.Module):
 
 class InverseModel(nn.Module):
     def __init__(self, env: RandomEnv, h: list, feature_size=10):
+        """
+        The inverse model of the ICM
+        """
+
         super(InverseModel, self).__init__()
         self.n_obs = env.obs_dimension
         self.n_act = env.act_dimension
@@ -86,6 +100,9 @@ class InverseModel(nn.Module):
 
 class ICM(nn.Module):
     def __init__(self, env: RandomEnv, fm_kw: {}, im_kw: {}, sf_kw: {}):
+        """
+        The ICM module, comprised of the forward model, inverse model and a feature extractor.
+        """
         super(ICM, self).__init__()
         self.n_obs = env.obs_dimension
         self.n_act = env.act_dimension
@@ -111,6 +128,16 @@ class ICM(nn.Module):
 
 class ICM_RandomEnv(RandomEnv):
     def __init__(self, n_obs, n_act, fm_kw=None, im_kw=None, sf_kw=None, **kwargs):
+        """
+        This is a RE, but you can now call ICM_RandomEnv.gradient_update(...) to update the components of the
+        curiosity module.
+        :param n_obs: Nb. of state dimensions
+        :param n_act: Nb. of action dimensions
+        :param fm_kw: Kwargs of forward model
+        :param im_kw: Kwargs of inverse model
+        :param sf_kw: Kwargs of state feature extractor
+        :param kwargs: Other kwargs to pass to parent RE
+        """
         super(ICM_RandomEnv, self).__init__(n_obs, n_act, **kwargs)
 
         if fm_kw is None:
@@ -182,6 +209,10 @@ class ICM_RandomEnv(RandomEnv):
 
 
 def train_icm_and_compare_to_re_random_trajectories():
+    """
+    Use a RandomAgent on an RE and ICM_RE, respectively, and see for any effects. None observed.
+    :return:
+    """
     n_obs, n_act = 2, 2
 
     max_steps = 100
@@ -344,9 +375,17 @@ def train_icm_and_compare_to_re_random_trajectories():
     plt.show()
 
 
-def train_ppo_compare_icmre_vs_re():
-    n_obs, n_act = 2, 2
+def train_ppo_compare_icmre_vs_re(n_obs, n_act):
+    """
+    Train PPO on RE and ICM_RE
+    :return:
+    """
     max_steps = 100
+
+    total_train_timesteps = int(1e6)
+    save_freq = 10000
+    eval_freq = 1000
+    n_eval_episodes = 10
 
     env_seed = 123
     feature_size = 2
@@ -355,16 +394,18 @@ def train_ppo_compare_icmre_vs_re():
                       im_kw=dict(h=icm_hidden_layers, feature_size=feature_size),
                       sf_kw=dict(h=icm_hidden_layers, feature_size=feature_size))
 
+    np.random.seed(env_seed)
     envs = []
+    envs.append(RandomEnv(n_obs=n_obs, n_act=n_act))
     envs.append(ICM_RandomEnv(n_obs=n_obs, n_act=n_act, estimate_scaling=True, **icm_kwargs))
-    envs.append(RandomEnv(n_obs=n_obs, n_act=n_act, model_info=envs[0].model_info))
+    # envs.append(RandomEnv(n_obs=n_obs, n_act=n_act, model_info=envs[0].model_info))
 
     for env in envs:
-        env.EPISODE_LENGTH_LIMIT = max_steps
-        env.max_steps = max_steps
         env.seed(env_seed)
+        env.EPISODE_LENGTH_LIMIT = max_steps
+        # env.max_steps = max_steps
 
-    model_prefix = lambda seed: f'{PPO}_{repr(envs[0])}_{seed}seed'
+    model_prefix = lambda seed: f'PPO_{repr(envs[0])}_{seed}seed'
 
     policy_kwargs = dict(net_arch=[dict(vf=[16, 16], pi=[16, 16])],
                          activation_fn=t.nn.ReLU)
@@ -391,12 +432,7 @@ def train_ppo_compare_icmre_vs_re():
                       verbose=1,
                       # seed=seed,  SET EXTERNALLY
                       device="auto",
-                      _init_setup_model=True,)
-
-    total_train_timesteps = int(5e5)
-    save_freq = 1000
-    eval_freq = 500
-    n_eval_episodes = 10
+                      _init_setup_model=True)
 
     def train(env, ppo_kwargs):
         nonlocal save_freq, eval_freq, n_eval_episodes, total_train_timesteps
@@ -404,7 +440,7 @@ def train_ppo_compare_icmre_vs_re():
         seed = ppo_kwargs['seed']
 
         par_dir = 'ppo_icm_experiments'
-        model_name = f'PPO_{repr(env)}_{dt.now().strftime("%m%d%y_%H%M%S")}'
+        model_name = f'PPO_{repr(env)}_{seed}seed_{dt.now().strftime("%m%d%y_%H%M%S")}'
 
         model_dir = os.path.join(par_dir, model_name)
         tensorboard_dir = os.path.join(model_dir, 'log')
@@ -427,7 +463,8 @@ def train_ppo_compare_icmre_vs_re():
 
 
 if __name__ == '__main__':
-    train_ppo_compare_icmre_vs_re()
+    env_sz = 5
+    train_ppo_compare_icmre_vs_re(n_obs=env_sz, n_act=env_sz)
     # env = RandomEnv(2, 2)
     # layer_kw = dict(h=[5, 5], feature_size=2)
     # icm = ICM(env, fm_kw=layer_kw, im_kw=layer_kw, sf_kw=layer_kw)
