@@ -2,8 +2,15 @@ import os.path
 from abc import ABC
 import numpy as np
 import yaml
+from datetime import datetime as dt
 from random_env.envs.random_env_discrete_actions import get_discrete_actions
 
+def get_random_alpha_numeral(sz=10):
+    chars = ''.join([str(item) for item in range(10)]) + 'abcdefghij'
+    ret = []
+    for _ in range(sz):
+        ret.append(chars[np.random.choice(len(chars))])
+    return ''.join(ret)
 
 def argmax(arr):
     return max((x, i) for i, x in enumerate(arr))[1]
