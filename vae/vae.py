@@ -105,6 +105,8 @@ if __name__ == '__main__':
 
     from random_env.envs import RandomEnv
 
+    plot_results = True
+
     buffer = TrajBuffer()
     par_dir = 'random_trajectory_training'
 
@@ -112,12 +114,15 @@ if __name__ == '__main__':
     latent_dims = np.arange(2, 6)
     hidden_dims = [10, 10]
 
-    nb_eps = 3
-    max_steps = 10
+    nb_eps = 1000
+    max_steps = 100
 
     batch_size = 4
-    nb_training_steps = 100
-    learning_rate = 1e-2
+    nb_training_steps = 10000
+    learning_rate = 1e-3
+    kld_weight = 0.01
+
+    loss_ratio_success = 0.01
 
     seed = 123
     np.random.seed(seed)
@@ -130,12 +135,22 @@ if __name__ == '__main__':
         print(f'-> {repr(env)}')
 
         for latent_sz in latent_dims:
+            if latent_sz > env_sz:
+                continue
+
+            exp_name = f"VAE-RE_{dt.now().strftime('%m%d%y_%H%M%S')}_{env_sz}obsx{env_sz}act_{latent_sz}z_{seed}seed"
+            exp_path = os.path.join(par_dir, exp_name)
+            if not os.path.exists(exp_path):
+                os.makedirs(exp_path)
+            else:
+                raise FileExistsError
+
             vae = VAE(in_dim=n_obs, latent_dim=latent_sz, hidden_dims=hidden_dims)
 
             optim = t.optim.SGD(vae.parameters(), lr=learning_rate)
 
-            print(f' `-> {repr(vae)}')
-            print(f' `-> Collecting episodes')
+            print(f' `-> Created {repr(vae)}')
+            print(f'   `-> Collecting episodes')
 
             for ep in range(nb_eps):
                 buffer.reset()
@@ -148,26 +163,56 @@ if __name__ == '__main__':
                     buffer.add(o, a, r, otp1)
                     o = otp1.copy()
 
-            print(f' `-> Training VAE')
+            print(f'   `-> Training VAE')
             losses = []
+            it = 0
             for it in range(nb_training_steps):
                 o, a, r, otp1 = buffer.sample_batch(batch_size=batch_size)
 
                 optim.zero_grad()
 
                 o_tilde, _, mu, logvar = vae.forward(t.Tensor(o))
-                loss = vae.loss_function(o_tilde, o, mu, logvar, kld_weight=0.01)['loss']
+                o = t.Tensor(o)
+                loss = vae.loss_function(o_tilde, o, mu, logvar, kld_weight=kld_weight)['loss']
 
                 loss.backward()
                 optim.step()
 
-                losses.append(loss.item())
+                loss = loss.item()
+                losses.append(loss)
+                # Stop training early
+                if loss < losses[0] * loss_ratio_success:
+                    break
 
-            project_name = f"{dt.now().strftime('%m%d%y_%H%M%S')}_{env_sz}obsx{env_sz}act_{latent_sz}z_{seed}seed"
-            vae_name = f"{repr(vae)}.pkl"
-            t.save(vae, os.path.join(par_dir, project_name, vae_name))
-            env.save_dynamics(os.path.join(par_dir, project_name))
-            np.save(os.path.join(par_dir, project_name, 'losses.npy'), np.array(losses))
+            print(f'   `-> Saving to: {exp_path}')
 
+            t.save(vae, os.path.join(exp_path, f"{repr(vae)}.pkl"))
+            env.save_dynamics(exp_path)
+            np.save(os.path.join(exp_path, 'losses.npy'), np.array(losses))
+            with open(os.path.join(exp_path, 'info.txt'), 'w') as f:
+                f.write(f'-> Experiment name: {exp_name}\n')
+                f.write(f'-> Environment name: {repr(env)}\n')
+                f.write(f'-> Latent size: {latent_sz}\n')
+                f.write(f'-> Train env max steps: {max_steps}\n')
+                f.write(f'-> Number of training its: {it}\n')
+                f.write(f'-> Lowest loss: {min(losses)}\n')
+                f.write(f'-> Loss improvement: {((losses[-1] - losses[0]) / losses[0]) * 100.0}%\n')
+                f.write(f'-> Loss improvement (ptp): {((np.min([-1]) - np.max(losses)) / np.max(losses[0])) * 100.0}%\n')
+                f.write(f'-> Experiment_path: {os.path.abspath(exp_path)}\n')
+
+            if plot_results:
+                plot_path = os.path.join(exp_path, 'losses.png')
+                print(f' `-> Plotting losses to: {plot_path}')
+                import matplotlib.pyplot as plt
+                from utils.plotting_utils import grid_on
+                fig, ax = plt.subplots(figsize=(12,7))
+                ax.plot(losses)
+                ax.axhline(0.0, ls='--', color='k')
+                grid_on(ax=ax, axis='x')
+                grid_on(ax=ax, axis='y')
+                ax.set_xlabel('Training iterations')
+                ax.set_ylabel('Loss')
+                fig.tight_layout()
+                fig.savefig(plot_path)
 
 
