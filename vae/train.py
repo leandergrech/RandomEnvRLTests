@@ -13,7 +13,7 @@ plot_results = True
 
 buffer = TrajBuffer()
 
-env_szs = np.arange(6, 11)
+env_szs = np.arange(2, 11)
 latent_dims = np.arange(2, 11)
 hidden_dims = [32, 32]
 
@@ -27,9 +27,10 @@ kld_weight = 0.01
 
 loss_ratio_success = 0.01
 
-seed = 123
+# seed = 234
+seed = 567
 
-par_dir = f'random_trajectory_{batch_size}batch_{learning_rate}lr_{kld_weight}klw_{seed}seed'
+par_dir = f'random_trajectory_{batch_size}batch_{learning_rate}lr_{kld_weight}kld'
 
 for env_sz in env_szs:
     np.random.seed(seed)
@@ -45,7 +46,7 @@ for env_sz in env_szs:
             continue
 
         # exp_name = f"VAE-RE_{dt.now().strftime('%m%d%y_%H%M%S')}_{env_sz}obsx{env_sz}act_{latent_sz}z_{seed}seed"
-        exp_name = f"VAE-RE_{get_random_alpha_numeral()}_{env_sz}obsx{env_sz}act_{latent_sz}z_{seed}seed"
+        exp_name = f"VAE-RE_{env_sz}obsx{env_sz}act_{latent_sz}z_{seed}seed_{get_random_alpha_numeral()}"
         exp_path = os.path.join(par_dir, exp_name)
         if not os.path.exists(exp_path):
             os.makedirs(exp_path)

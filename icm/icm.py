@@ -375,7 +375,7 @@ def train_icm_and_compare_to_re_random_trajectories():
     plt.show()
 
 
-def train_ppo_compare_icmre_vs_re(n_obs, n_act):
+def train_ppo_compare_icmre_vs_re(n_obs, n_act, seed):
     """
     Train PPO on RE and ICM_RE
     :return:
@@ -388,8 +388,10 @@ def train_ppo_compare_icmre_vs_re(n_obs, n_act):
     n_eval_episodes = 10
 
     env_seed = 123
-    feature_size = 2
-    icm_hidden_layers = [5, 5]
+    feature_size = n_obs
+
+    # icm_hidden_layers = [5, 5]
+    icm_hidden_layers = [16, 16]
     icm_kwargs = dict(fm_kw=dict(h=icm_hidden_layers, feature_size=feature_size),
                       im_kw=dict(h=icm_hidden_layers, feature_size=feature_size),
                       sf_kw=dict(h=icm_hidden_layers, feature_size=feature_size))
@@ -456,30 +458,13 @@ def train_ppo_compare_icmre_vs_re(n_obs, n_act):
         agent.learn(total_timesteps=total_train_timesteps, callback=callbacks, log_interval=eval_freq//5,
                     eval_env=eval_env, eval_freq=eval_freq, n_eval_episodes=n_eval_episodes)
 
-    for seed in (123, 234, 345, 456, 567):
-        ppo_kwargs['seed'] = seed
-        for env in envs:
-            train(env, ppo_kwargs)
+    # for seed in (123,):# 234, 345, 456, 567):
+    ppo_kwargs['seed'] = seed
+    for env in envs:
+        train(env, ppo_kwargs)
 
 
 if __name__ == '__main__':
-    env_sz = 5
-    train_ppo_compare_icmre_vs_re(n_obs=env_sz, n_act=env_sz)
-    # env = RandomEnv(2, 2)
-    # layer_kw = dict(h=[5, 5], feature_size=2)
-    # icm = ICM(env, fm_kw=layer_kw, im_kw=layer_kw, sf_kw=layer_kw)
-    # # for parameter in icm.named_parameters():
-    # #     print(parameter)
-    # print(len([item for item in icm.named_parameters()]))
-    # print(len([item for item in icm.parameters()]))
-    #
-    # print(sum([len(item) for item in icm.named_parameters()]))
-    # print(sum([len(item) for item in icm.parameters()]))
-    #
-    # print([len(item) for item in icm.named_parameters()])
-    # print([len(item) for item in icm.parameters()])
-    #
-    # print([item for item in icm.named_parameters()])
-    # print([item for item in icm.parameters()])
-    #
-    #
+    env_sz = 6
+    seed = 123
+    train_ppo_compare_icmre_vs_re(n_obs=env_sz, n_act=env_sz, seed=seed)

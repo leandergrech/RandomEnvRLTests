@@ -33,13 +33,15 @@ def make_heatmap(ax, z, x, y, title=None):
     xmin, xmax = get_min_and_max(x)
     ymin, ymax = get_min_and_max(y)
 
-    im = ax.matshow(z, extent=(xmin, xmax, ymin, ymax), aspect='auto', origin='lower', cmap='jet', zorder=5)
+    im = ax.matshow(z, extent=(xmin, xmax, ymin, ymax), aspect='auto', origin='lower', cmap=None, zorder=5)
     ax.axvline(0.0, c='w', zorder=15)
     ax.axhline(0.0, c='w', zorder=15)
-    plt.colorbar(im, ax=ax, orientation='horizontal')
+    cb = plt.colorbar(im, ax=ax, orientation='vertical')
     if title is not None:
         im.axes.set_title(title)
-    return im
+    ax.set_xlim((2, 10))
+    ax.set_ylim((2, 10))
+    return im, cb
 
 
 def update_heatmap(im, z, title=None):
